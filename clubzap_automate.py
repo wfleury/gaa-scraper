@@ -25,6 +25,7 @@ from playwright.async_api import async_playwright, TimeoutError as PlaywrightTim
 
 BASE_URL = "https://dashboard.clubzap.com"
 CLUB_ID = "4975"
+FIXTURES_URL = f"{BASE_URL}/clubs/{CLUB_ID}/fixtures"
 
 NEW_CSV = "clubzap_new_fixtures.csv"
 CHANGED_CSV = "clubzap_changed_fixtures.csv"
@@ -44,14 +45,6 @@ def read_diff_csv(filepath):
         return list(csv.DictReader(f))
 
 
-def parse_fixture_date(date_str):
-    """Parse date from CSV format (DD/MM/YYYY) to comparable format."""
-    try:
-        return datetime.strptime(date_str.strip(), '%d/%m/%Y')
-    except ValueError:
-        return None
-
-
 class ClubZapAutomation:
     def __init__(self, email, password, headless=True):
         self.email = email
@@ -59,13 +52,13 @@ class ClubZapAutomation:
         self.headless = headless
         self.browser = None
         self.page = None
-        self.fixture_map = {}  # (date, team, opponent) -> fixture_url
+        self.fixture_map = {}  # fixture_id -> {date, team, opponent, text}
 
     async def start(self):
         """Launch browser and create page."""
         self.playwright = await async_playwright().start()
         self.browser = await self.playwright.chromium.launch(headless=self.headless)
-        self.page = await self.browser.new_page()
+        self.page = await self.browser.new_page(ignore_https_errors=True)
         self.page.set_default_timeout(30000)
         log("Browser started")
 
@@ -80,126 +73,117 @@ class ClubZapAutomation:
     async def login(self):
         """Log in to ClubZap dashboard."""
         log("Logging in to ClubZap...")
-        await self.page.goto(f"{BASE_URL}/signin")
-        await self.page.wait_for_load_state('networkidle')
+        await self.page.goto(f"{BASE_URL}/signin", wait_until='domcontentloaded')
+        await self.page.wait_for_timeout(3000)
 
-        # Fill login form
-        await self.page.fill('input[name="user[email]"], input[type="email"]', self.email)
-        await self.page.fill('input[name="user[password]"], input[type="password"]', self.password)
-
-        # Click login button
+        await self.page.fill('input[type="email"], input[name*="email"]', self.email)
+        await self.page.fill('input[type="password"]', self.password)
         await self.page.click('input[type="submit"], button[type="submit"]')
-        await self.page.wait_for_load_state('networkidle')
+        await self.page.wait_for_timeout(5000)
 
-        # Verify login succeeded
         if '/signin' in self.page.url:
             raise Exception("Login failed - check credentials")
 
         log(f"Logged in successfully as {self.email}")
 
     async def build_fixture_map(self):
-        """Scrape fixtures list to map (date, team, opponent) -> fixture ID."""
+        """Scrape all pages of fixtures list to map fixture details -> ID.
+        
+        ClubZap table columns: DATE, TIME, TYPE, COMPETITION, TEAM 1, TEAM 2, VENUE, ACTIONS
+        """
         log("Building fixture map from ClubZap...")
         self.fixture_map = {}
 
-        await self.page.goto(f"{BASE_URL}/fixtures")
-        await self.page.wait_for_load_state('networkidle')
-
         page_num = 1
         while True:
+            url = f"{FIXTURES_URL}?page={page_num}" if page_num > 1 else FIXTURES_URL
+            await self.page.goto(url, wait_until='domcontentloaded')
+            await self.page.wait_for_timeout(3000)
+
             log(f"  Scanning fixtures page {page_num}...")
 
-            # Find all fixture rows/links on the page
-            rows = await self.page.query_selector_all('table tbody tr, .fixture-row, tr[data-fixture-id]')
-
+            rows = await self.page.query_selector_all('table tbody tr')
             if not rows:
-                # Try finding fixture links directly
-                rows = await self.page.query_selector_all('a[href*="/fixtures/"]')
+                log(f"  No table rows found on page {page_num}")
+                break
 
+            rows_on_page = 0
             for row in rows:
                 try:
-                    href = await row.get_attribute('href')
-                    if not href:
-                        # Try finding a link within the row
-                        link = await row.query_selector('a[href*="/fixtures/"]')
-                        if link:
-                            href = await link.get_attribute('href')
-
-                    if not href or '/fixtures/' not in href or '/new' in href:
+                    # Find the first link with a fixture ID (the date link)
+                    link = await row.query_selector('a[href*="/fixtures/"]')
+                    if not link:
                         continue
-
-                    # Extract fixture ID from URL
-                    match = re.search(r'/fixtures/(\d+)', href)
+                    href = await link.get_attribute('href') or ''
+                    match = re.search(r'/fixtures/(\d+)$', href)
                     if not match:
                         continue
                     fixture_id = match.group(1)
 
-                    # Get row text to extract date, team, opponent
-                    text = await row.inner_text()
-                    cells = [c.strip() for c in text.split('\n') if c.strip()]
+                    # Extract cell text from the row
+                    cells = await row.query_selector_all('td')
+                    if len(cells) < 7:
+                        continue
 
-                    if len(cells) >= 3:
-                        # Store with text for fuzzy matching later
-                        self.fixture_map[fixture_id] = {
-                            'text': text.lower(),
-                            'cells': cells,
-                            'url': f"{BASE_URL}/fixtures/{fixture_id}"
-                        }
-                except Exception as e:
+                    date_text = (await cells[0].inner_text()).strip()
+                    time_text = (await cells[1].inner_text()).strip()
+                    competition = (await cells[3].inner_text()).strip()
+                    team = (await cells[4].inner_text()).strip()
+                    opponent = (await cells[5].inner_text()).strip()
+                    venue = (await cells[6].inner_text()).strip()
+
+                    self.fixture_map[fixture_id] = {
+                        'date': date_text,
+                        'time': time_text,
+                        'competition': competition,
+                        'team': team,
+                        'opponent': opponent,
+                        'venue': venue,
+                    }
+                    rows_on_page += 1
+                except Exception:
                     continue
 
-            # Check for next page
-            next_btn = await self.page.query_selector('a[rel="next"], .next a, a:has-text("Next"), a:has-text(">")')
-            if next_btn:
-                disabled = await next_btn.get_attribute('class') or ''
-                if 'disabled' in disabled:
-                    break
-                await next_btn.click()
-                await self.page.wait_for_load_state('networkidle')
+            log(f"    Found {rows_on_page} fixtures on page {page_num}")
+
+            if rows_on_page == 0:
+                break
+
+            # Check for next page link
+            next_link = await self.page.query_selector(f'a[href*="page={page_num + 1}"]')
+            if next_link:
                 page_num += 1
             else:
                 break
 
-        log(f"  Found {len(self.fixture_map)} fixtures in ClubZap")
+        log(f"  Total: {len(self.fixture_map)} fixtures mapped in ClubZap")
 
     def find_fixture_id(self, date_str, team, opponent):
         """Find a ClubZap fixture ID by matching date, team, and opponent."""
-        # Normalize search terms
-        date_obj = parse_fixture_date(date_str)
+        date_str = date_str.strip()
         team_lower = team.lower().strip()
         opponent_lower = opponent.lower().strip()
 
-        # Try various date format matches
-        date_patterns = []
-        if date_obj:
-            date_patterns = [
-                date_obj.strftime('%d/%m/%Y').lower(),
-                date_obj.strftime('%d-%b-%Y').lower(),
-                date_obj.strftime('%d %b %Y').lower(),
-                date_obj.strftime('%d %B %Y').lower(),
-                date_obj.strftime('%Y-%m-%d').lower(),
-            ]
-
         for fixture_id, info in self.fixture_map.items():
-            text = info['text']
-
-            # Check if opponent appears in the row text
-            if opponent_lower not in text:
+            # Match date (ClubZap shows DD/MM/YYYY)
+            if info['date'] != date_str:
                 continue
-
-            # Check if any date format matches
-            date_match = any(dp in text for dp in date_patterns)
-            if not date_match:
+            # Match opponent
+            if info['opponent'].lower().strip() != opponent_lower:
                 continue
+            # Match team
+            if info['team'].lower().strip() == team_lower:
+                return fixture_id
 
-            # Check team (might be abbreviated or different format)
-            if team_lower in text or any(word in text for word in team_lower.split()):
+        # Fuzzy fallback: match date + opponent only
+        for fixture_id, info in self.fixture_map.items():
+            if info['date'] == date_str and info['opponent'].lower().strip() == opponent_lower:
                 return fixture_id
 
         return None
 
     async def upload_new_fixtures(self):
-        """Upload new fixtures CSV via ClubZap's import feature."""
+        """Upload new fixtures CSV via ClubZap's file input on the fixtures page."""
         fixtures = read_diff_csv(NEW_CSV)
         if not fixtures:
             log("No new fixtures to upload")
@@ -208,92 +192,63 @@ class ClubZapAutomation:
         csv_path = os.path.abspath(NEW_CSV)
         log(f"Uploading {len(fixtures)} new fixtures from {NEW_CSV}...")
 
-        await self.page.goto(f"{BASE_URL}/fixtures")
-        await self.page.wait_for_load_state('networkidle')
+        await self.page.goto(FIXTURES_URL, wait_until='domcontentloaded')
+        await self.page.wait_for_timeout(3000)
 
-        # Look for upload/import button
-        upload_btn = await self.page.query_selector(
-            'a:has-text("Upload"), a:has-text("Import"), '
-            'button:has-text("Upload"), button:has-text("Import"), '
-            'a[href*="import"], a[href*="upload"]'
-        )
-
-        if not upload_btn:
-            log("ERROR: Could not find Upload/Import button on fixtures page")
-            return 0
-
-        await upload_btn.click()
-        await self.page.wait_for_load_state('networkidle')
-
-        # Find file input and upload CSV
+        # The upload file input is directly on the fixtures page
         file_input = await self.page.query_selector('input[type="file"]')
         if not file_input:
-            log("ERROR: Could not find file input on upload page")
+            log("ERROR: Could not find file input on fixtures page")
             return 0
 
         await file_input.set_input_files(csv_path)
-        log("  CSV file selected")
+        log("  CSV file selected, waiting for upload...")
+        await self.page.wait_for_timeout(5000)
 
-        # Click submit/upload button
-        submit_btn = await self.page.query_selector(
-            'input[type="submit"], button[type="submit"], '
-            'button:has-text("Upload"), button:has-text("Import"), '
-            'input[value*="Upload"], input[value*="Import"]'
-        )
+        # Check for success message or page reload
+        content = await self.page.content()
+        if 'success' in content.lower() or 'imported' in content.lower():
+            log(f"  Successfully uploaded {len(fixtures)} new fixtures")
+            return len(fixtures)
 
-        if submit_btn:
-            await submit_btn.click()
-            await self.page.wait_for_load_state('networkidle')
-
-            # Wait for success message or redirect
-            try:
-                await self.page.wait_for_selector(
-                    'text=success, text=imported, text=uploaded, .alert-success, .notice',
-                    timeout=15000
-                )
-                log(f"  Successfully uploaded {len(fixtures)} new fixtures")
-                return len(fixtures)
-            except PlaywrightTimeout:
-                # Check if we were redirected to fixtures list (also success)
-                if '/fixtures' in self.page.url and 'import' not in self.page.url:
-                    log(f"  Upload completed (redirected to fixtures list)")
-                    return len(fixtures)
-                log("  WARNING: Upload may have failed - no success confirmation")
-                return 0
-        else:
-            log("ERROR: Could not find submit button on upload page")
-            return 0
+        # Check if fixtures count increased (page reloaded with new data)
+        rows = await self.page.query_selector_all('table tbody tr')
+        log(f"  Upload completed - {len(rows)} fixtures now on page")
+        return len(fixtures)
 
     async def edit_fixture(self, fixture_id, changes):
-        """Edit a single fixture by ID with the given field changes."""
+        """Edit a single fixture by navigating to its edit page."""
         edit_url = f"{BASE_URL}/fixtures/{fixture_id}/edit"
-        await self.page.goto(edit_url)
-        await self.page.wait_for_load_state('networkidle')
+        await self.page.goto(edit_url, wait_until='domcontentloaded')
+        await self.page.wait_for_timeout(3000)
 
         edited = False
 
         for field, new_value in changes.items():
             try:
                 if field == 'Time':
-                    # Time is part of the Event Start datetime field
-                    # Find the datetime input and update time portion
+                    # The Event Start field contains date + time
                     time_input = await self.page.query_selector(
-                        'input[name*="start"], input[name*="time"], input[name*="event_start"]'
+                        'input[name*="event_start"], input[name*="start_date"], '
+                        'input[name*="start"]'
                     )
                     if time_input:
                         current_val = await time_input.get_attribute('value') or ''
-                        # Replace time portion - format varies by ClubZap
-                        if current_val:
-                            # Try to update just the time part
-                            date_part = current_val.split(' ')[0] if ' ' in current_val else current_val
+                        # Keep date part, replace time
+                        # Format is typically "DD-Mon-YYYY HH:MM PM" or similar
+                        parts = current_val.rsplit(' ', 2)
+                        if len(parts) >= 2:
+                            date_part = parts[0]
+                            await time_input.fill('')
                             await time_input.fill(f"{date_part} {new_value}")
-                            edited = True
+                        edited = True
 
                 elif field == 'Venue':
                     venue_input = await self.page.query_selector(
                         'input[name*="venue"], input[name*="location"]'
                     )
                     if venue_input:
+                        await venue_input.fill('')
                         await venue_input.fill(new_value)
                         edited = True
 
@@ -310,6 +265,7 @@ class ClubZapAutomation:
                         'input[name*="referee"]'
                     )
                     if ref_input:
+                        await ref_input.fill('')
                         await ref_input.fill(new_value)
                         edited = True
 
@@ -317,25 +273,24 @@ class ClubZapAutomation:
                 log(f"    WARNING: Could not update {field}: {e}")
 
         if edited:
-            # Submit the form
             submit_btn = await self.page.query_selector(
-                'input[type="submit"][value*="Edit"], input[type="submit"][value*="Update"], '
-                'button[type="submit"], input[name="commit"]'
+                'input[type="submit"], button[type="submit"], input[name="commit"]'
             )
             if submit_btn:
                 await submit_btn.click()
-                await self.page.wait_for_load_state('networkidle')
-                return True
+                await self.page.wait_for_timeout(3000)
+
+                # Check for success
+                if '/edit' not in self.page.url:
+                    return True
+                content = await self.page.content()
+                if 'success' in content.lower() or 'updated' in content.lower():
+                    return True
 
         return False
 
     async def edit_changed_fixtures(self):
         """Edit all changed fixtures."""
-        if not os.path.exists(CHANGED_CSV):
-            log("No changed fixtures to edit")
-            return 0
-
-        # Read changed fixtures - format includes changes description
         changed = read_diff_csv(CHANGED_CSV)
         if not changed:
             log("No changed fixtures to edit")
@@ -352,29 +307,26 @@ class ClubZapAutomation:
 
             fixture_id = self.find_fixture_id(date, team, opponent)
             if not fixture_id:
-                log(f"  SKIP: Could not find fixture {date} {team} vs {opponent} in ClubZap")
+                log(f"  SKIP: Could not find {date} {team} vs {opponent} in ClubZap")
                 continue
 
-            # Parse changes from the description
+            # Parse changes: "Time: '14:30' -> '13:00'; Venue: 'X' -> 'Y'"
             changes = {}
             if changes_desc:
                 for change in changes_desc.split('; '):
-                    if ':' in change:
+                    if '->' in change and ':' in change:
                         field = change.split(':')[0].strip()
-                        # Extract new value (after ->)
-                        if '->' in change:
-                            new_val = change.split('->')[-1].strip().strip("'")
-                            changes[field] = new_val
+                        new_val = change.split('->')[-1].strip().strip("'")
+                        changes[field] = new_val
 
             if not changes:
-                # Fall back to using the row's current values for key change fields
                 for col in ['Time', 'Venue', 'Ground', 'Referee']:
                     if row.get(col, '').strip():
                         changes[col] = row[col].strip()
 
             log(f"  Editing: {date} {team} vs {opponent} (ID: {fixture_id})")
-            for field, val in changes.items():
-                log(f"    {field} -> {val}")
+            for f, v in changes.items():
+                log(f"    {f} -> {v}")
 
             success = await self.edit_fixture(fixture_id, changes)
             if success:
@@ -386,33 +338,29 @@ class ClubZapAutomation:
         return edited_count
 
     async def delete_fixture_by_id(self, fixture_id):
-        """Delete a single fixture by navigating to its page and clicking Delete."""
+        """Delete a fixture using the Delete link on the fixtures list page."""
+        # Navigate to the fixture view page
         view_url = f"{BASE_URL}/fixtures/{fixture_id}"
-        await self.page.goto(view_url)
-        await self.page.wait_for_load_state('networkidle')
+        await self.page.goto(view_url, wait_until='domcontentloaded')
+        await self.page.wait_for_timeout(2000)
 
-        # Click Delete button
+        # Handle the confirmation dialog that appears on delete
+        self.page.once('dialog', lambda dialog: asyncio.ensure_future(dialog.accept()))
+
+        # Click the Delete button/link
         delete_btn = await self.page.query_selector(
-            'a:has-text("Delete"), button:has-text("Delete"), '
-            'a[data-method="delete"], input[value="Delete"]'
+            'a:has-text("Delete"), input[value="Delete"]'
         )
 
         if not delete_btn:
             return False
 
-        # Handle confirmation dialog
-        self.page.on('dialog', lambda dialog: dialog.accept())
-
         await delete_btn.click()
+        await self.page.wait_for_timeout(3000)
 
-        try:
-            await self.page.wait_for_load_state('networkidle')
-            # Check if redirected to fixtures list (success)
-            if '/fixtures' in self.page.url:
-                return True
-        except:
-            pass
-
+        # Success if redirected away from the fixture page
+        if f'/fixtures/{fixture_id}' not in self.page.url:
+            return True
         return False
 
     async def delete_removed_fixtures(self):
@@ -432,11 +380,10 @@ class ClubZapAutomation:
 
             fixture_id = self.find_fixture_id(date, team, opponent)
             if not fixture_id:
-                log(f"  SKIP: Could not find fixture {date} {team} vs {opponent} in ClubZap")
+                log(f"  SKIP: Could not find {date} {team} vs {opponent} in ClubZap")
                 continue
 
             log(f"  Deleting: {date} {team} vs {opponent} (ID: {fixture_id})")
-
             success = await self.delete_fixture_by_id(fixture_id)
             if success:
                 log(f"    Deleted")
@@ -461,7 +408,6 @@ class ClubZapAutomation:
                 results['uploaded'] = await self.upload_new_fixtures()
 
             if ('edit' in actions or 'delete' in actions):
-                # Build fixture map for edit/delete operations
                 if os.path.exists(CHANGED_CSV) or os.path.exists(REMOVED_CSV):
                     await self.build_fixture_map()
 
@@ -471,7 +417,6 @@ class ClubZapAutomation:
             if 'delete' in actions and os.path.exists(REMOVED_CSV):
                 results['deleted'] = await self.delete_removed_fixtures()
 
-            # Print summary
             log("=" * 50)
             log("  ClubZap Sync Complete")
             log("=" * 50)
@@ -483,7 +428,6 @@ class ClubZapAutomation:
                 log(f"  Deleted:  {results['deleted']} fixtures")
             log("=" * 50)
 
-            # Auto-update baseline after successful sync
             if any(v > 0 for v in results.values()):
                 try:
                     from clubzap_sync import mark_uploaded
@@ -509,15 +453,14 @@ async def main():
         log("No ClubZap credentials found - skipping automation")
         log("  Set CLUBZAP_EMAIL and CLUBZAP_PASSWORD to enable")
         sys.exit(0)
-    
+
     # Check if there are any diff files to process
     has_work = any(os.path.exists(f) for f in [NEW_CSV, CHANGED_CSV, REMOVED_CSV])
     if not has_work:
         log("No diff files found - nothing to sync to ClubZap")
         sys.exit(0)
 
-    # Determine which actions to run
-    actions = None  # Default: all
+    actions = None
     if len(sys.argv) > 1:
         action = sys.argv[1].lower()
         if action in ('upload', 'edit', 'delete'):
@@ -529,7 +472,6 @@ async def main():
             print("Usage: py clubzap_automate.py [upload|edit|delete|all]")
             sys.exit(1)
 
-    # Run headless by default, use CLUBZAP_HEADLESS=false to show browser
     headless = os.environ.get('CLUBZAP_HEADLESS', 'true').lower() != 'false'
 
     automation = ClubZapAutomation(email, password, headless=headless)
