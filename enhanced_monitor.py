@@ -426,6 +426,8 @@ Add-Type -AssemblyName System.Windows.Forms
                 return False
         else:
             self.log_message(f"INFO: No changes - {current_data['count']} fixtures")
+            # Always regenerate CSV so it's available for artifacts and sync
+            self.regenerate_csv(current_data['text'])
             return True
 
 def main():
