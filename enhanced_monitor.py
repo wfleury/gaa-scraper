@@ -379,7 +379,10 @@ CSV updated: {self.output_file}
 
 def main():
     monitor = EnhancedFixtureMonitor()
-    monitor.check_for_changes()
+    try:
+        monitor.check_for_changes()
+    finally:
+        monitor.selenium_scraper.close()
 
 if __name__ == "__main__":
     main()

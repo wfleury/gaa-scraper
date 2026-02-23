@@ -47,25 +47,39 @@ class SeleniumScraper:
             print(f"Loading page: {url}")
             self.driver.get(url)
             
-            # Wait for page to load
-            time.sleep(3)
+            # Wait for initial page load
+            time.sleep(5)
             
             # Wait for JavaScript to execute and load fixtures
             print("Waiting for JavaScript to load fixtures...")
             
-            # Try multiple methods to find fixtures
+            # Retry with increasing waits (cloud environments are slower)
+            for attempt in range(3):
+                wait_time = 15 + (attempt * 10)  # 15s, 25s, 35s
+                print(f"Attempt {attempt + 1}/3 (waiting up to {wait_time}s)...")
+                
+                # Method 1: Wait for fixture elements with data-date
+                try:
+                    fixture_elements = WebDriverWait(self.driver, wait_time).until(
+                        EC.presence_of_all_elements_located((By.CSS_SELECTOR, 'ul[data-date]'))
+                    )
+                    print(f"Found {len(fixture_elements)} fixture elements via CSS selector")
+                    return self.process_fixture_elements(fixture_elements)
+                except TimeoutException:
+                    print(f"No fixture elements found on attempt {attempt + 1}")
+                
+                # Method 2: Try JavaScript finder
+                js_fixtures = self.execute_javascript_fixture_finder()
+                if js_fixtures:
+                    return js_fixtures
+                
+                # Scroll page to trigger any lazy loading
+                self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+                time.sleep(2)
+                self.driver.execute_script("window.scrollTo(0, 0);")
+                time.sleep(2)
             
-            # Method 1: Wait for fixture elements to appear
-            try:
-                fixture_elements = WebDriverWait(self.driver, 10).until(
-                    EC.presence_of_all_elements_located((By.CSS_SELECTOR, 'ul[data-date]'))
-                )
-                print(f"Found {len(fixture_elements)} fixture elements via CSS selector")
-                return self.process_fixture_elements(fixture_elements)
-            except TimeoutException:
-                print("No fixture elements found with data-date attribute")
-            
-            # Method 2: Look for elements with 'fixtures' in class
+            # Method 3: Look for elements with 'fixtures' in class
             try:
                 fixture_elements = self.driver.find_elements(By.CSS_SELECTOR, 'ul[class*="fixtures"]')
                 if fixture_elements:
@@ -74,7 +88,7 @@ class SeleniumScraper:
             except:
                 print("No fixture elements found with 'fixtures' in class")
             
-            # Method 3: Look for any table-like structures
+            # Method 4: Look for any table-like structures
             try:
                 fixture_elements = self.driver.find_elements(By.CSS_SELECTOR, 'ul.table-body')
                 if fixture_elements:
@@ -82,12 +96,6 @@ class SeleniumScraper:
                     return self.process_fixture_elements(fixture_elements)
             except:
                 print("No table-body elements found")
-            
-            # Method 4: Execute JavaScript to find fixtures
-            print("Executing JavaScript to find fixtures...")
-            js_fixtures = self.execute_javascript_fixture_finder()
-            if js_fixtures:
-                return js_fixtures
             
             # Method 5: Check page source after JavaScript execution
             print("Checking page source after JavaScript execution...")
