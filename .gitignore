@@ -1,0 +1,22 @@
+# Generated/temporary files
+fixture_hashes.json
+monitoring_log.txt
+clubzap_uploaded_baseline.csv
+clubzap_new_fixtures.csv
+clubzap_changed_fixtures.csv
+clubzap_removed_fixtures.csv
+Ballincollig_Fixtures_Final.csv
+competitions_2026.txt
+
+# Diagnostic/test scripts
+inspect_fixture_html.py
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.env
+
+# IDE
+.vscode/
+.idea/
