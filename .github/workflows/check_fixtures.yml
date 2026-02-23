@@ -29,7 +29,9 @@ jobs:
         uses: nanasess/setup-chromedriver@v2
 
       - name: Install Python dependencies
-        run: pip install -r requirements.txt
+        run: |
+          pip install -r requirements.txt
+          playwright install chromium
 
       - name: Restore previous fixture data
         uses: actions/cache@v4
@@ -48,6 +50,13 @@ jobs:
 
       - name: Run ClubZap sync diff
         run: python clubzap_sync.py diff
+
+      - name: Sync changes to ClubZap
+        continue-on-error: true
+        run: python clubzap_automate.py
+        env:
+          CLUBZAP_EMAIL: ${{ secrets.CLUBZAP_EMAIL }}
+          CLUBZAP_PASSWORD: ${{ secrets.CLUBZAP_PASSWORD }}
 
       - name: Upload fixture CSVs
         if: always()

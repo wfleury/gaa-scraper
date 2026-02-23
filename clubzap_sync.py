@@ -118,7 +118,18 @@ def diff_fixtures():
         os.remove(NEW_CSV)
     
     if changed_fixtures:
-        write_csv(CHANGED_CSV, [r for r, _ in changed_fixtures])
+        # Include a Changes column describing what changed
+        changed_rows = []
+        for row, changes in changed_fixtures:
+            row_copy = dict(row)
+            row_copy['Changes'] = '; '.join(changes)
+            changed_rows.append(row_copy)
+        changed_header = HEADER + ['Changes']
+        with open(CHANGED_CSV, 'w', encoding='utf-8', newline='') as f:
+            writer = csv.DictWriter(f, fieldnames=changed_header)
+            writer.writeheader()
+            for row in changed_rows:
+                writer.writerow(row)
     elif os.path.exists(CHANGED_CSV):
         os.remove(CHANGED_CSV)
     
