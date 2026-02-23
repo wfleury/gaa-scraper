@@ -259,25 +259,25 @@ class ClubZapAutomation:
         for field, new_value in changes.items():
             try:
                 if field == 'Time':
-                    # The Event Start field contains date + time
+                    # datetime-local input: value format is 2026-09-30T19:00:00
                     time_input = await self.page.query_selector(
-                        'input[name*="event_start"], input[name*="start_date"], '
-                        'input[name*="start"]'
+                        '#fixture_event_attributes_start, input[name*="[start]"]'
                     )
                     if time_input:
                         current_val = await time_input.get_attribute('value') or ''
-                        # Keep date part, replace time
-                        # Format is typically "DD-Mon-YYYY HH:MM PM" or similar
-                        parts = current_val.rsplit(' ', 2)
-                        if len(parts) >= 2:
-                            date_part = parts[0]
-                            await time_input.fill('')
-                            await time_input.fill(f"{date_part} {new_value}")
-                        edited = True
+                        # Replace time portion: keep date (YYYY-MM-DD), replace T and after
+                        if 'T' in current_val:
+                            date_part = current_val.split('T')[0]
+                            # new_value is like "20:00" from CSV
+                            new_dt = f"{date_part}T{new_value}:00"
+                            await time_input.evaluate('el => el.value = ""')
+                            await time_input.fill(new_dt)
+                            log(f"    Time: {current_val} -> {new_dt}")
+                            edited = True
 
                 elif field == 'Venue':
                     venue_input = await self.page.query_selector(
-                        'input[name*="venue"], input[name*="location"]'
+                        '#fixture_event_attributes_venue, input[name*="[venue]"]'
                     )
                     if venue_input:
                         await venue_input.fill('')
@@ -285,16 +285,18 @@ class ClubZapAutomation:
                         edited = True
 
                 elif field == 'Ground':
+                    # Select values are lowercase: home, away, neutral
                     ground_select = await self.page.query_selector(
-                        'select[name*="ground"], select[name*="home_away"]'
+                        '#fixture_event_attributes_ground_type, select[name*="[ground_type]"]'
                     )
                     if ground_select:
-                        await ground_select.select_option(label=new_value)
+                        val = new_value.lower().strip()
+                        await ground_select.select_option(value=val)
                         edited = True
 
                 elif field == 'Referee':
                     ref_input = await self.page.query_selector(
-                        'input[name*="referee"]'
+                        '#fixture_event_attributes_referee, input[name*="[referee]"]'
                     )
                     if ref_input:
                         await ref_input.fill('')
