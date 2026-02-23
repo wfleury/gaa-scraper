@@ -33,10 +33,8 @@ jobs:
       - name: "Step 1: Add fake fixture"
         if: ${{ github.event.inputs.step == '1-add-fake' }}
         run: |
-          cat > clubzap_new_fixtures.csv << 'EOF'
-          Date,Time,Venue,Ground,Referee,Team,Competition Name,Your Club Name,Opponent,Event Type
-          30/09/2026,19:00,Ballincollig,Home,TBC (Pending),Senior Football,TEST AUTOMATION,Ballincollig,AUTOMATION TEST TEAM,League
-          EOF
+          printf 'Date,Time,Venue,Ground,Referee,Team,Competition Name,Your Club Name,Opponent,Event Type\n30/09/2026,19:00,Ballincollig,Home,TBC (Pending),Senior Football,TEST AUTOMATION,Ballincollig,AUTOMATION TEST TEAM,League\n' > clubzap_new_fixtures.csv
+          cat clubzap_new_fixtures.csv
           python clubzap_automate.py upload
         env:
           CLUBZAP_EMAIL: ${{ secrets.CLUBZAP_EMAIL }}
@@ -45,10 +43,8 @@ jobs:
       - name: "Step 2: Edit fake fixture"
         if: ${{ github.event.inputs.step == '2-edit-fake' }}
         run: |
-          cat > clubzap_changed_fixtures.csv << 'EOF'
-          Date,Time,Venue,Ground,Referee,Team,Competition Name,Your Club Name,Opponent,Event Type,Changes
-          30/09/2026,20:00,Pairc Ui Rinn,Away,John Smith,Senior Football,TEST AUTOMATION,Ballincollig,AUTOMATION TEST TEAM,League,Time: '19:00' -> '20:00'; Venue: 'Ballincollig' -> 'Pairc Ui Rinn'; Referee: 'TBC (Pending)' -> 'John Smith'
-          EOF
+          printf "Date,Time,Venue,Ground,Referee,Team,Competition Name,Your Club Name,Opponent,Event Type,Changes\n30/09/2026,20:00,Pairc Ui Rinn,Away,John Smith,Senior Football,TEST AUTOMATION,Ballincollig,AUTOMATION TEST TEAM,League,Time: '19:00' -> '20:00'; Venue: 'Ballincollig' -> 'Pairc Ui Rinn'; Referee: 'TBC (Pending)' -> 'John Smith'\n" > clubzap_changed_fixtures.csv
+          cat clubzap_changed_fixtures.csv
           python clubzap_automate.py edit
         env:
           CLUBZAP_EMAIL: ${{ secrets.CLUBZAP_EMAIL }}
@@ -57,10 +53,8 @@ jobs:
       - name: "Step 3: Remove fake fixture"
         if: ${{ github.event.inputs.step == '3-remove-fake' }}
         run: |
-          cat > clubzap_removed_fixtures.csv << 'EOF'
-          Date,Time,Venue,Ground,Referee,Team,Competition Name,Your Club Name,Opponent,Event Type
-          30/09/2026,20:00,Pairc Ui Rinn,Away,John Smith,Senior Football,TEST AUTOMATION,Ballincollig,AUTOMATION TEST TEAM,League
-          EOF
+          printf 'Date,Time,Venue,Ground,Referee,Team,Competition Name,Your Club Name,Opponent,Event Type\n30/09/2026,20:00,Pairc Ui Rinn,Away,John Smith,Senior Football,TEST AUTOMATION,Ballincollig,AUTOMATION TEST TEAM,League\n' > clubzap_removed_fixtures.csv
+          cat clubzap_removed_fixtures.csv
           python clubzap_automate.py delete
         env:
           CLUBZAP_EMAIL: ${{ secrets.CLUBZAP_EMAIL }}

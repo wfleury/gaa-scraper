@@ -195,6 +195,10 @@ class ClubZapAutomation:
         await self.page.goto(FIXTURES_URL, wait_until='domcontentloaded')
         await self.page.wait_for_timeout(3000)
 
+        # Count existing fixtures before upload
+        rows_before = await self.page.query_selector_all('table tbody tr')
+        log(f"  Fixtures before upload: {len(rows_before)}")
+
         # The upload file input is directly on the fixtures page
         file_input = await self.page.query_selector('input[type="file"]')
         if not file_input:
@@ -202,19 +206,47 @@ class ClubZapAutomation:
             return 0
 
         await file_input.set_input_files(csv_path)
-        log("  CSV file selected, waiting for upload...")
-        await self.page.wait_for_timeout(5000)
+        log("  CSV file selected")
 
-        # Check for success message or page reload
+        # Look for a submit/upload button to click after file selection
+        submit_btn = await self.page.query_selector(
+            'input[type="submit"][value*="Upload"], input[type="submit"][value*="Import"], '
+            'input[type="submit"], button[type="submit"]'
+        )
+        if submit_btn:
+            btn_text = await submit_btn.get_attribute('value') or await submit_btn.inner_text()
+            log(f"  Clicking submit button: {btn_text}")
+            await submit_btn.click()
+            await self.page.wait_for_timeout(8000)
+        else:
+            log("  No submit button found, waiting for auto-upload...")
+            await self.page.wait_for_timeout(8000)
+
+        # Check page for success indicators
         content = await self.page.content()
-        if 'success' in content.lower() or 'imported' in content.lower():
+        page_text = await self.page.inner_text('body')
+        log(f"  Current URL: {self.page.url}")
+
+        if 'success' in content.lower() or 'imported' in content.lower() or 'uploaded' in content.lower():
             log(f"  Successfully uploaded {len(fixtures)} new fixtures")
             return len(fixtures)
 
-        # Check if fixtures count increased (page reloaded with new data)
-        rows = await self.page.query_selector_all('table tbody tr')
-        log(f"  Upload completed - {len(rows)} fixtures now on page")
-        return len(fixtures)
+        # Check for error messages
+        alerts = await self.page.query_selector_all('.alert, .error, .flash, .notice')
+        for alert in alerts:
+            text = (await alert.inner_text()).strip()
+            if text:
+                log(f"  Alert: {text}")
+
+        # Check if fixture count changed
+        rows_after = await self.page.query_selector_all('table tbody tr')
+        log(f"  Fixtures after upload: {len(rows_after)}")
+        if len(rows_after) > len(rows_before):
+            log(f"  Upload appears successful ({len(rows_after) - len(rows_before)} new)")
+            return len(fixtures)
+
+        log("  WARNING: Upload may have failed - check ClubZap manually")
+        return 0
 
     async def edit_fixture(self, fixture_id, changes):
         """Edit a single fixture by navigating to its edit page."""
