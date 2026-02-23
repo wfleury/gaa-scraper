@@ -275,7 +275,7 @@ Add-Type -AssemblyName System.Windows.Forms
         self.send_ntfy(title, message)
     
     def send_ntfy(self, title, message):
-        """Send push notification to phone via ntfy.sh"""
+        """Send push notification to phone via ntfy.sh with Ballincollig crest"""
         import urllib3
         urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
         try:
@@ -285,7 +285,7 @@ Add-Type -AssemblyName System.Windows.Forms
                 headers={
                     "Title": title,
                     "Priority": "high",
-                    "Tags": "soccer"
+                    "Icon": "https://sportlomo-userupload.s3.amazonaws.com/clubLogos/1986/ballincollig.gif"
                 },
                 timeout=10,
                 verify=False
@@ -348,25 +348,76 @@ Add-Type -AssemblyName System.Windows.Forms
             if self.regenerate_csv(current_data['text']):
                 self.save_current_data(current_data)
                 
-                # Send notification
-                notification_msg = f"""
-Previous: {previous_data['count']} fixtures
-Current: {current_data['count']} fixtures
-Added: {changes['added_count']}
-Removed: {changes['removed_count']}
-
-CSV updated: {self.output_file}
-                """.strip()
-                
-                self.send_notification("GAA Fixture Changes Detected", notification_msg)
-                
-                # Auto-run ClubZap sync diff
+                # Run ClubZap sync diff and build detailed notification
+                diff_summary = ""
                 try:
+                    from clubzap_sync import read_csv_fixtures, fixture_key, FULL_CSV, BASELINE_CSV, CHANGE_COLS
+                    current = read_csv_fixtures(FULL_CSV)
+                    baseline = read_csv_fixtures(BASELINE_CSV)
+                    
+                    new_items = []
+                    changed_items = []
+                    postponed_items = []
+                    removed_items = []
+                    
+                    for key, row in current.items():
+                        if row.get('Time', '') == 'Postponed':
+                            postponed_items.append(row)
+                        elif key not in baseline:
+                            new_items.append(row)
+                        else:
+                            old_row = baseline[key]
+                            row_changes = []
+                            for col in CHANGE_COLS:
+                                if old_row.get(col, '').strip() != row.get(col, '').strip():
+                                    row_changes.append(f"  {col}: {row.get(col, '')}")
+                            if row_changes:
+                                changed_items.append((row, row_changes))
+                    
+                    for key, row in baseline.items():
+                        if key not in current:
+                            removed_items.append(row)
+                    
+                    parts = []
+                    if new_items:
+                        parts.append(f"NEW ({len(new_items)}):")
+                        for r in new_items[:5]:
+                            parts.append(f"  {r['Date']} {r['Team']} vs {r['Opponent']}")
+                        if len(new_items) > 5:
+                            parts.append(f"  ...and {len(new_items)-5} more")
+                    
+                    if changed_items:
+                        parts.append(f"CHANGED ({len(changed_items)}):")
+                        for r, ch in changed_items[:5]:
+                            parts.append(f"  {r['Date']} {r['Team']} vs {r['Opponent']}")
+                            for c in ch:
+                                parts.append(f"    {c}")
+                        if len(changed_items) > 5:
+                            parts.append(f"  ...and {len(changed_items)-5} more")
+                    
+                    if postponed_items:
+                        parts.append(f"POSTPONED ({len(postponed_items)}):")
+                        for r in postponed_items:
+                            parts.append(f"  {r['Date']} {r['Team']} vs {r['Opponent']}")
+                    
+                    if removed_items:
+                        parts.append(f"REMOVED ({len(removed_items)}):")
+                        for r in removed_items:
+                            parts.append(f"  {r['Date']} {r['Team']} vs {r['Opponent']}")
+                    
+                    diff_summary = "\n".join(parts) if parts else "No ClubZap action needed"
+                    
+                    # Also run the full diff to generate CSV files
                     from clubzap_sync import diff_fixtures
                     self.log_message("Running ClubZap sync diff...")
                     diff_fixtures()
                 except Exception as e:
                     self.log_message(f"ClubZap sync diff failed: {e}")
+                    diff_summary = f"Fixtures: {previous_data['count']} -> {current_data['count']}"
+                
+                notification_msg = f"Ballincollig GAA Fixtures Update\n\n{diff_summary}"
+                
+                self.send_notification("Ballincollig GAA - Fixture Changes", notification_msg)
                 
                 self.log_message("SUCCESS: Changes processed successfully")
                 return True
