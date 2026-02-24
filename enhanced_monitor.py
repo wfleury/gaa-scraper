@@ -297,6 +297,29 @@ Add-Type -AssemblyName System.Windows.Forms
         except Exception as e:
             self.log_message(f"Failed to send ntfy.sh notification: {e}")
     
+    def send_ntfy_quiet(self, title, message):
+        """Send low-priority (silent) push notification via ntfy.sh"""
+        import urllib3
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+        try:
+            resp = requests.post(
+                f"https://ntfy.sh/{self.ntfy_topic}",
+                data=message.encode('utf-8'),
+                headers={
+                    "Title": title,
+                    "Priority": "low",
+                    "Icon": "https://sportlomo-userupload.s3.amazonaws.com/clubLogos/1986/ballincollig.gif"
+                },
+                timeout=10,
+                verify=False
+            )
+            if resp.status_code == 200:
+                self.log_message("ntfy.sh quiet notification sent")
+            else:
+                self.log_message(f"ntfy.sh returned status {resp.status_code}")
+        except Exception as e:
+            self.log_message(f"Failed to send ntfy.sh notification: {e}")
+    
     def analyze_changes(self, old_text, new_text):
         """Analyze what changed between old and new fixtures"""
         old_lines = set(old_text.split('\n')) if old_text else set()
@@ -428,6 +451,11 @@ Add-Type -AssemblyName System.Windows.Forms
             self.log_message(f"INFO: No changes - {current_data['count']} fixtures")
             # Always regenerate CSV so it's available for artifacts and sync
             self.regenerate_csv(current_data['text'])
+            # Send low-priority "all clear" notification so user knows monitor ran
+            self.send_ntfy_quiet(
+                "Ballincollig GAA - All Clear",
+                f"No fixture changes detected.\n{current_data['count']} fixtures monitored."
+            )
             return True
 
 def main():
