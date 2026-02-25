@@ -256,6 +256,7 @@ class ClubZapAutomation:
         await self.page.wait_for_timeout(3000)
 
         edited = False
+        failed_fields = []
 
         for field, new_value in changes.items():
             try:
@@ -307,6 +308,7 @@ class ClubZapAutomation:
 
             except Exception as e:
                 log(f"    WARNING: Could not update {field}: {e}")
+                failed_fields.append(field)
 
         if edited:
             submit_btn = await self.page.query_selector(
@@ -318,12 +320,12 @@ class ClubZapAutomation:
 
                 # Check for success
                 if '/edit' not in self.page.url:
-                    return True
+                    return True, len(failed_fields) > 0
                 content = await self.page.content()
                 if 'success' in content.lower() or 'updated' in content.lower():
-                    return True
+                    return True, len(failed_fields) > 0
 
-        return False
+        return False, len(failed_fields) > 0
 
     async def edit_changed_fixtures(self):
         """Edit all changed fixtures."""
@@ -364,12 +366,17 @@ class ClubZapAutomation:
             for f, v in changes.items():
                 log(f"    {f} -> {v}")
 
-            success = await self.edit_fixture(fixture_id, changes)
+            success, had_failures = await self.edit_fixture(fixture_id, changes)
             if success:
-                log(f"    Saved")
+                if had_failures:
+                    log(f"    Partially saved (some fields failed)")
+                else:
+                    log(f"    Saved")
                 edited_count += 1
             else:
                 log(f"    WARNING: Edit may not have saved")
+            if had_failures:
+                self._edit_failures = True
 
         return edited_count
 
@@ -465,12 +472,16 @@ class ClubZapAutomation:
             log("=" * 50)
 
             if any(v > 0 for v in results.values()):
-                try:
-                    from clubzap_sync import mark_uploaded
-                    log("Updating baseline...")
-                    mark_uploaded()
-                except Exception as e:
-                    log(f"WARNING: Could not update baseline: {e}")
+                if getattr(self, '_edit_failures', False):
+                    log("WARNING: Some edits failed - skipping baseline update")
+                    log("  Next run will retry the failed edits")
+                else:
+                    try:
+                        from clubzap_sync import mark_uploaded
+                        log("Updating baseline...")
+                        mark_uploaded()
+                    except Exception as e:
+                        log(f"WARNING: Could not update baseline: {e}")
 
             return results
 
