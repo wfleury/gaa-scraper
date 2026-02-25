@@ -27,6 +27,7 @@ BASE_URL = "https://dashboard.clubzap.com"
 CLUB_ID = "4975"
 FIXTURES_URL = f"{BASE_URL}/clubs/{CLUB_ID}/fixtures"
 
+BASELINE_CSV = "clubzap_uploaded_baseline.csv"
 NEW_CSV = "clubzap_new_fixtures.csv"
 CHANGED_CSV = "clubzap_changed_fixtures.csv"
 REMOVED_CSV = "clubzap_removed_fixtures.csv"
