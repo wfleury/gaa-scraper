@@ -269,8 +269,9 @@ class ClubZapAutomation:
                         # Replace time portion: keep date (YYYY-MM-DD), replace T and after
                         if 'T' in current_val:
                             date_part = current_val.split('T')[0]
-                            # new_value is like "20:00" from CSV
-                            new_dt = f"{date_part}T{new_value}:00"
+                            # new_value is like "19:30" from CSV
+                            # datetime-local fill() requires YYYY-MM-DDTHH:mm (no seconds)
+                            new_dt = f"{date_part}T{new_value}"
                             await time_input.evaluate('el => el.value = ""')
                             await time_input.fill(new_dt)
                             log(f"    Time: {current_val} -> {new_dt}")
