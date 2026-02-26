@@ -2,9 +2,8 @@ name: GAA Fixture Monitor
 
 on:
   schedule:
-    # Runs daily at 10:00 AM Irish time (UTC+0 in winter, UTC+1 in summer)
-    # Using 10:00 UTC to cover both
-    - cron: '0 10 * * *'
+    # Runs daily at 06:00 UTC (off-peak for reliability)
+    - cron: '0 6 * * *'
   workflow_dispatch:  # Allows manual trigger from GitHub
 
 jobs:
@@ -47,6 +46,7 @@ jobs:
         run: python enhanced_monitor.py
         env:
           DISPLAY: ':99'
+          NTFY_QUIET: '1'
 
       - name: Run ClubZap sync diff
         run: python clubzap_sync.py diff

@@ -166,3 +166,173 @@ Running ClubZap sync diff...
 Windows toast notification sent
 ntfy.sh mobile notification sent
 SUCCESS: Changes processed successfully
+Chrome driver initialized successfully
+Starting fixture check...
+Loading page: https://gaacork.ie/clubprofile/1986/?team_id=327535
+Waiting for JavaScript to load fixtures...
+Attempt 1/3 (waiting up to 15s)...
+Found 117 fixture elements via CSS selector
+Found fixture: 27 Feb 2026 - Ballincollig vs Brian Dillons (AOS Security Football League Div 2 G2 )
+Found fixture: 28 Feb 2026 - Carrigaline vs Ballincollig (McCarthy Insurance Group Division 2 FL)
+Found fixture: 28 Feb 2026 - Ballincollig vs Canovee (EPH Junior Football League Division 1)
+Found fixture: 01 Mar 2026 - Ballincollig vs Whites Cross (AOS Security Football League Div 4)
+Found fixture: 01 Mar 2026 - Ballincollig 2 vs Inniscarra (Rebel Og Mid Fe16 Division 1 Section 2 Football League)
+Found fixture: 01 Mar 2026 - Aghabullogue vs Ballincollig 2 (Rebel Og Mid Fe18 Division 1 Section 1 Football League)
+Found fixture: 02 Mar 2026 - Mallow vs Ballincollig (Rebel Og Coiste Fe14 Premier 1 Football League)
+Found fixture: 04 Mar 2026 - Carrigaline vs Ballincollig (Rebel Og Coiste Fe18 Premier 1 Football League)
+Found fixture: 08 Mar 2026 - Ballymartle vs Ballincollig (Red FM Division 2 HL)
+Found fixture: 08 Mar 2026 - Mayfield vs Ballincollig (AOS Security Hurling League Div 2 G1 )
+Found fixture: 08 Mar 2026 - St Finbarrs vs Ballincollig (Rebel Og Coiste Fe16 Premier 1 Football League)
+Found fixture: 08 Mar 2026 - Ballincollig vs Delanys (AOS Security Hurling League Div 3 )
+Found fixture: 09 Mar 2026 - Clyda Rovers vs Ballincollig 2 (Rebel Og Mid Fe16 Division 1 Section 2 Football League)
+Found fixture: 13 Mar 2026 - Ballincollig vs Béal Átha'n Ghaorthaidh (McCarthy Insurance Group Division 2 FL)
+Found fixture: 14 Mar 2026 - Ballincollig vs Killeagh (Rebel Og Coiste Fe14 Premier 2 Section 2 Hurling League)
+Found fixture: 14 Mar 2026 - Ballincollig vs Ballingeary (EPH Junior Football League Division 1)
+Found fixture: 15 Mar 2026 - Carrigaline vs Ballincollig (Rebel Og Coiste Fe18 Premier 1 Hurling League)
+Found fixture: 15 Mar 2026 - Whitechurch vs Ballincollig (AOS Security Football League Div 4)
+Found fixture: 15 Mar 2026 - Ballinora vs Ballincollig (EPH Junior Football League Division 2 East)
+Found fixture: 17 Mar 2026 - Fermoy vs Ballincollig 2 (Rebel Og East Fe16 Division 1 Section 2 Hurling League)
+Found fixture: 17 Mar 2026 - Kiltha Og vs Ballincollig (Rebel Og Coiste Fe16 Premier 1 Hurling League)
+Found fixture: 21 Mar 2026 - Ballincollig vs Kilmichael (Cumnor Junior Hurling League Division 1)
+Found fixture: 22 Mar 2026 - Ballincollig vs Lough Rovers (AOS Security Hurling League Div 2 G1 )
+Found fixture: 22 Mar 2026 - Valley Rovers vs Ballincollig (Red FM Division 2 HL)
+Found fixture: 22 Mar 2026 - Ballincollig vs Douglas (Rebel Og Coiste Fe18 Premier 1 Football League)
+Found fixture: 22 Mar 2026 - Duarigle Gaels vs Ballincollig 2 (Rebel Og Mid Fe18 Division 1 Section 1 Football League)
+Found fixture: 22 Mar 2026 - Ballincollig vs St Colmcilles (Rebel Og Coiste Fe14 Premier 1 Football League)
+Found fixture: 22 Mar 2026 - Carrigaline 2 vs Ballincollig 2 (Rebel Og Mid Fe14 Division 1 Section 2 Football League)
+Found fixture: 22 Mar 2026 - Ballincollig vs Ballyphehane (AOS Security Hurling League Div 3 )
+Found fixture: 28 Mar 2026 - Grenagh vs Ballincollig (EPH Junior Football League Division 1)
+Found fixture: 29 Mar 2026 - Castletownbere vs Ballincollig (McCarthy Insurance Group Division 2 FL)
+Found fixture: 29 Mar 2026 - Ballincollig vs Na Piarsaigh (Rebel Og Coiste Fe18 Premier 1 Hurling League)
+Found fixture: 30 Mar 2026 - Ballincollig 2 vs Bishopstown (Rebel Og East Fe16 Division 1 Section 2 Hurling League)
+Found fixture: 30 Mar 2026 - Ballincollig vs Eire Og (Rebel Og Coiste Fe16 Premier 1 Hurling League)
+Found fixture: 30 Mar 2026 - Ballincollig vs Blarney (EPH Junior Football League Division 2 East)
+Found fixture: 01 Apr 2026 - Ballincollig 2 vs Glenville (Rebel Og Mid Fe14 Division 1 Section 2 Football League)
+Found fixture: 01 Apr 2026 - Ballincollig vs Nemo Rangers (Rebel Og Coiste Fe14 Premier 1 Football League)
+Found fixture: 03 Apr 2026 - Ballincollig vs Clonakilty (Rebel Og Coiste Fe18 Premier 1 Football League)
+Found fixture: 03 Apr 2026 - Ballincollig 2 vs Inniscarra (Rebel Og Mid Fe18 Division 1 Section 1 Football League)
+Found fixture: 03 Apr 2026 - Ballincollig vs Carrigaline (Red FM Division 2 HL)
+Found fixture: 04 Apr 2026 - Inniscarra vs Ballincollig (Cumnor Junior Hurling League Division 1)
+Found fixture: 06 Apr 2026 - Kilshannig vs Ballincollig 2 (Rebel Og Mid Fe18 Division 1 Section 1 Football League)
+Found fixture: 06 Apr 2026 - Bishopstown vs Ballincollig (Rebel Og Coiste Fe18 Premier 1 Football League)
+Found fixture: 08 Apr 2026 - Ballincollig 2 vs St Michaels (Rebel Og Mid Fe16 Division 1 Section 2 Football League)
+Found fixture: 08 Apr 2026 - Eire Og vs Ballincollig (Rebel Og Coiste Fe16 Premier 1 Football League)
+Found fixture: 10 Apr 2026 - Kinsale vs Ballincollig 2 (Rebel Og Mid Fe14 Division 1 Section 2 Football League)
+Found fixture: 10 Apr 2026 - Douglas vs Ballincollig (Rebel Og Coiste Fe14 Premier 1 Football League)
+Found fixture: 11 Apr 2026 - Ballincollig vs St Michaels (McCarthy Insurance Group Division 2 FL)
+Found fixture: 11 Apr 2026 - Ballincollig vs Aghabullogue (EPH Junior Football League Division 1)
+Found fixture: 12 Apr 2026 - Glanmire vs Ballincollig (AOS Security Football League Div 2 G2 )
+Found fixture: 13 Apr 2026 - St Colmcilles vs Ballincollig 2 (Rebel Og East Fe16 Division 1 Section 2 Hurling League)
+Found fixture: 13 Apr 2026 - Glen Rovers vs Ballincollig (Rebel Og Coiste Fe16 Premier 1 Hurling League)
+Found fixture: 13 Apr 2026 - Inniscarra vs Ballincollig (EPH Junior Football League Division 2 East)
+Found fixture: 15 Apr 2026 - Ballincollig vs Carrigtwohill (Rebel Og Coiste Fe18 Premier 1 Hurling League)
+Found fixture: 17 Apr 2026 - Ballincollig vs Erins Own (Red FM Division 2 HL)
+Found fixture: 18 Apr 2026 - Ballincollig vs Dripsey (Cumnor Junior Hurling League Division 1)
+Found fixture: 20 Apr 2026 - Ballincollig vs Nemo Rangers (Rebel Og Coiste Fe16 Premier 1 Football League)
+Found fixture: 20 Apr 2026 - Ballincollig 2 vs Douglas 2 (Rebel Og Mid Fe16 Division 1 Section 2 Football League)
+Found fixture: 22 Apr 2026 - Ballincollig vs Nemo Rangers (Rebel Og Coiste Fe18 Premier 1 Football League)
+Found fixture: 22 Apr 2026 - Ballincollig 2 vs Croke Rovers (Rebel Og Mid Fe18 Division 1 Section 1 Football League)
+Found fixture: 25 Apr 2026 - Kilmichael vs Ballincollig (EPH Junior Football League Division 1)
+Found fixture: 26 Apr 2026 - Ballincollig vs St Vincents (AOS Security Football League Div 2 G2 )
+Found fixture: 26 Apr 2026 - Ballincollig vs Dohenys (McCarthy Insurance Group Division 2 FL)
+Found fixture: 27 Apr 2026 - Ballincollig 2 vs Mallow (Rebel Og East Fe16 Division 1 Section 2 Hurling League)
+Found fixture: 27 Apr 2026 - Ballincollig vs Ballinora (Rebel Og Coiste Fe16 Premier 1 Hurling League)
+Found fixture: 27 Apr 2026 - Ballincollig vs Donoughmore (EPH Junior Football League Division 2 East)
+Found fixture: 29 Apr 2026 - Blarney vs Ballincollig (Rebel Og Coiste Fe14 Premier 2 Section 2 Hurling League)
+Found fixture: 30 Apr 2026 - Newcestown vs Ballincollig (Red FM Division 2 HL)
+Found fixture: 01 May 2026 - Midleton vs Ballincollig (Rebel Og Coiste Fe18 Premier 1 Hurling League)
+Found fixture: 02 May 2026 - Grenagh vs Ballincollig (Cumnor Junior Hurling League Division 1)
+Found fixture: 04 May 2026 - Na Piarsaigh vs Ballincollig (Rebel Og Coiste Fe18 Premier 1 Football League)
+Found fixture: 06 May 2026 - Ballincollig vs Douglas (Rebel Og Coiste Fe16 Premier 1 Football League)
+Found fixture: 06 May 2026 - Blarney vs Ballincollig 2 (Rebel Og Mid Fe16 Division 1 Section 2 Football League)
+Found fixture: 09 May 2026 - Ballincollig vs Eire Og (EPH Junior Football League Division 1)
+Found fixture: 10 May 2026 - Clyda Rovers vs Ballincollig (McCarthy Insurance Group Division 2 FL)
+Found fixture: 10 May 2026 - Ballincollig vs Ballinora (EPH Junior Football League Division 3 East)
+Found fixture: 11 May 2026 - Ballincollig vs Ballyhea Milford (Rebel Og Coiste Fe16 Premier 1 Hurling League)
+Found fixture: 13 May 2026 - Ballincollig vs Blackrock (Rebel Og Coiste Fe18 Premier 1 Hurling League)
+Found fixture: 16 May 2026 - Ballincollig vs Eire Og (Cumnor Junior Hurling League Division 1)
+Found fixture: 17 May 2026 - Ballincollig vs Na Piarsaigh (Red FM Division 2 HL)
+Found fixture: 17 May 2026 - Ballincollig vs Kilmichael (Erneside Eng Junior Hurling League Division 3)
+Found fixture: 18 May 2026 - Ballincollig vs Macroom (Rebel Og Coiste Fe16 Premier 1 Football League)
+Found fixture: 20 May 2026 - Ballincollig vs Glanmire (Rebel Og Coiste Fe18 Premier 1 Football League)
+Found fixture: 23 May 2026 - Clondrohid vs Ballincollig (EPH Junior Football League Division 1)
+Found fixture: 24 May 2026 - Ballincollig vs Uibh Laoire (McCarthy Insurance Group Division 2 FL)
+Found fixture: 24 May 2026 - Donoughmore vs Ballincollig (EPH Junior Football League Division 3 East)
+Found fixture: 25 May 2026 - Blarney vs Ballincollig (Rebel Og Coiste Fe16 Premier 1 Hurling League)
+Found fixture: 25 May 2026 - Gleann na Laoi vs Ballincollig (EPH Junior Football League Division 2 East)
+Found fixture: 30 May 2026 - Aghabullogue vs Ballincollig (Cumnor Junior Hurling League Division 1)
+Found fixture: 31 May 2026 - Kanturk vs Ballincollig (Red FM Division 2 HL)
+Found fixture: 31 May 2026 - Laochra Og vs Ballincollig (Erneside Eng Junior Hurling League Division 3)
+Found fixture: 06 Jun 2026 - Ballincollig vs Donoughmore (Cumnor Junior Hurling League Division 1)
+Found fixture: 07 Jun 2026 - O Donovan Rossa vs Ballincollig (McCarthy Insurance Group Division 2 FL)
+Found fixture: 08 Jun 2026 - Ballincollig vs Eire Og (EPH Junior Football League Division 2 East)
+Found fixture: 13 Jun 2026 - Blarney vs Ballincollig (Cumnor Junior Hurling League Division 1)
+Found fixture: 14 Jun 2026 - Ballincollig vs Bride Rovers (Red FM Division 2 HL)
+Found fixture: 14 Jun 2026 - Ballincollig vs Gleann na Laoi (Erneside Eng Junior Hurling League Division 3)
+Found fixture: 17 Jun 2026 - Bishopstown vs Ballincollig (Rebel Og Coiste Fe16 Premier 1 Football League)
+Found fixture: 19 Jun 2026 - Ballincollig vs Glen Rovers (Rebel Og Coiste Fe14 Premier 2 Section 2 Hurling League)
+Found fixture: 21 Jun 2026 - Ballincollig vs Valley Rovers (McCarthy Insurance Group Division 2 FL)
+Found fixture: 21 Jun 2026 - Ballincollig vs Grenagh (EPH Junior Football League Division 3 East)
+Found fixture: 22 Jun 2026 - Ballincollig vs Midleton (Rebel Og Coiste Fe16 Premier 1 Hurling League)
+Found fixture: 24 Jun 2026 - Sarsfields vs Ballincollig (Rebel Og Coiste Fe18 Premier 1 Hurling League)
+Found fixture: 28 Jun 2026 - Newtownshandrum vs Ballincollig (Red FM Division 2 HL)
+Found fixture: 28 Jun 2026 - Ballincollig vs Ballyphehane (Erneside Eng Junior Hurling League Division 3)
+Found fixture: 03 Jul 2026 - Ballincollig 2 vs Courcey Rovers (Rebel Og Mid Fe14 Division 1 Section 2 Football League)
+Found fixture: 03 Jul 2026 - Ballincollig vs Glanmire (Rebel Og Coiste Fe14 Premier 1 Football League)
+Found fixture: 05 Jul 2026 - Inniscarra vs Ballincollig (EPH Junior Football League Division 3 East)
+Found fixture: 08 Jul 2026 - Ballincollig vs Glen Rovers (Rebel Og Coiste Fe18 Premier 1 Hurling League)
+Found fixture: 10 Jul 2026 - Kiltha Og vs Ballincollig (Rebel Og Coiste Fe14 Premier 2 Section 2 Hurling League)
+Found fixture: 12 Jul 2026 - Lough Rovers vs Ballincollig (Erneside Eng Junior Hurling League Division 3)
+Found fixture: 23 Jul 2026 - Ballincollig vs Mallow (Rebel Og Coiste Fe14 Premier 2 Section 2 Hurling League)
+Found fixture: 30 Jul 2026 - Carrigaline vs Ballincollig (Rebel Og Coiste Fe14 Premier 1 Football League)
+Found fixture: 06 Aug 2026 - Bride Rovers vs Ballincollig (Rebel Og Coiste Fe14 Premier 2 Section 2 Hurling League)
+Found fixture: 11 Aug 2026 - Ballincollig vs Eire Og (Rebel Og Coiste Fe14 Premier 1 Football League)
+Found fixture: 22 Feb 2026 - Ballincollig vs Ballinora (Rebel Og Coiste Fe16 Premier 1 Football League)
+Found fixture: 21 Feb 2026 - Ballincollig 2 vs Ballinhassig (Rebel Og Mid Fe14 Division 1 Section 2 Football League)
+Processed 117 Ballincollig fixtures
+ALERT: FIXTURE CHANGES DETECTED!
+INFO: Previous: 116 fixtures
+INFO: Current: 117 fixtures
+INFO: Added: 1 fixtures
+INFO: Removed: 0 fixtures
+Running ClubZap sync diff...
+============================================================
+  ClubZap Sync - Fixture Diff Report
+  25/02/2026 17:30
+============================================================
+  Current fixtures (website):  117
+  Baseline (uploaded):         118
+------------------------------------------------------------
+
+  NEW fixtures (bulk import):   2
+  CHANGED fixtures (edit):      2
+  POSTPONED (delete):           0
+  REMOVED fixtures (delete):    3
+  Unchanged:                    113
+
+  -> clubzap_new_fixtures.csv
+     Bulk upload this file to ClubZap
+     Contains 2 new fixtures:
+       01/03/2026 U16 GAA vs Inniscarra
+       09/03/2026 U16 GAA vs Clyda Rovers
+
+  -> clubzap_changed_fixtures.csv
+     Manually update these 2 fixtures in ClubZap:
+       01/03/2026 Minor Football GAA vs Aghabullogue
+         Time: '12:30' -> '19:30'
+         Venue: 'Coachford' -> 'Ballincollig'
+       22/03/2026 Junior A Hurling vs Lough Rovers
+         Referee: 'Cormac Dineen (Pending)' -> 'Cormac Dineen'
+
+  -> clubzap_removed_fixtures.csv
+     Manually delete these 3 fixtures from ClubZap:
+       23/02/2026 U16 GAA vs Inniscarra
+       08/03/2026 U16 GAA vs Clyda Rovers
+       29/03/2026 Junior A Football vs Bishopstown
+
+  After making changes in ClubZap, run:
+  py clubzap_sync.py uploaded
+============================================================
+Windows toast notification sent
+ntfy.sh mobile notification sent
+SUCCESS: Changes processed successfully

@@ -278,13 +278,15 @@ Add-Type -AssemblyName System.Windows.Forms
         """Send push notification to phone via ntfy.sh with Ballincollig crest"""
         import urllib3
         urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+        # Use low priority (silent) when NTFY_QUIET is set (e.g. early morning GitHub Actions)
+        priority = "low" if os.environ.get("NTFY_QUIET") else "high"
         try:
             resp = requests.post(
                 f"https://ntfy.sh/{self.ntfy_topic}",
                 data=message.encode('utf-8'),
                 headers={
                     "Title": title,
-                    "Priority": "high",
+                    "Priority": priority,
                     "Icon": "https://sportlomo-userupload.s3.amazonaws.com/clubLogos/1986/ballincollig.gif"
                 },
                 timeout=10,
