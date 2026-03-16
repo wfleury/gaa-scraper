@@ -23,14 +23,10 @@ import re
 from datetime import datetime
 from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeout
 
-BASE_URL = "https://dashboard.clubzap.com"
-CLUB_ID = "4975"
-FIXTURES_URL = f"{BASE_URL}/clubs/{CLUB_ID}/fixtures"
-
-BASELINE_CSV = "clubzap_uploaded_baseline.csv"
-NEW_CSV = "clubzap_new_fixtures.csv"
-CHANGED_CSV = "clubzap_changed_fixtures.csv"
-REMOVED_CSV = "clubzap_removed_fixtures.csv"
+from config import (
+    CLUBZAP_BASE_URL as BASE_URL, CLUBZAP_FIXTURES_URL as FIXTURES_URL,
+    BASELINE_CSV, NEW_CSV, CHANGED_CSV, REMOVED_CSV,
+)
 
 
 def log(msg):
@@ -54,12 +50,13 @@ class ClubZapAutomation:
         self.browser = None
         self.page = None
         self.fixture_map = {}  # fixture_id -> {date, team, opponent, text}
+        self._edit_failures = False
 
     async def start(self):
         """Launch browser and create page."""
         self.playwright = await async_playwright().start()
         self.browser = await self.playwright.chromium.launch(headless=self.headless)
-        self.page = await self.browser.new_page(ignore_https_errors=True)
+        self.page = await self.browser.new_page()
         self.page.set_default_timeout(30000)
         log("Browser started")
 
@@ -142,7 +139,8 @@ class ClubZapAutomation:
                         'venue': venue,
                     }
                     rows_on_page += 1
-                except Exception:
+                except Exception as e:
+                    log(f"    WARNING: Error parsing fixture row: {e}")
                     continue
 
             log(f"    Found {rows_on_page} fixtures on page {page_num}")
@@ -176,9 +174,10 @@ class ClubZapAutomation:
             if info['team'].lower().strip() == team_lower:
                 return fixture_id
 
-        # Fuzzy fallback: match date + opponent only
+        # Fuzzy fallback: match date + opponent only (may be ambiguous if multiple teams play same opponent on same date)
         for fixture_id, info in self.fixture_map.items():
             if info['date'] == date_str and info['opponent'].lower().strip() == opponent_lower:
+                log(f"    NOTE: Fuzzy match used for {date_str} vs {opponent_lower} (matched team: {info['team']})")
                 return fixture_id
 
         return None
@@ -225,7 +224,6 @@ class ClubZapAutomation:
 
         # Check page for success indicators
         content = await self.page.content()
-        page_text = await self.page.inner_text('body')
         log(f"  Current URL: {self.page.url}")
 
         if 'success' in content.lower() or 'imported' in content.lower() or 'uploaded' in content.lower():
@@ -244,7 +242,7 @@ class ClubZapAutomation:
         log(f"  Fixtures after upload: {len(rows_after)}")
         if len(rows_after) > len(rows_before):
             log(f"  Upload appears successful ({len(rows_after) - len(rows_before)} new)")
-            return len(fixtures)
+            return len(rows_after) - len(rows_before)
 
         log("  WARNING: Upload may have failed - check ClubZap manually")
         return 0
@@ -441,6 +439,8 @@ class ClubZapAutomation:
         if actions is None:
             actions = ['upload', 'edit', 'delete']
 
+        self._edit_failures = False  # reset for this run
+
         try:
             await self.start()
             await self.login()
@@ -510,7 +510,6 @@ async def main():
     # First-run protection: skip bulk upload if no baseline exists
     # This prevents uploading ALL fixtures when the baseline hasn't been established
     if os.path.exists(NEW_CSV) and not os.path.exists(BASELINE_CSV):
-        import csv
         with open(NEW_CSV, 'r') as f:
             count = sum(1 for _ in csv.DictReader(f))
         if count > 20:

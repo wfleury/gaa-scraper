@@ -18,20 +18,10 @@ import os
 import sys
 import shutil
 from datetime import datetime
-
-FULL_CSV = 'Ballincollig_Fixtures_Final.csv'
-BASELINE_CSV = 'clubzap_uploaded_baseline.csv'
-NEW_CSV = 'clubzap_new_fixtures.csv'
-CHANGED_CSV = 'clubzap_changed_fixtures.csv'
-REMOVED_CSV = 'clubzap_removed_fixtures.csv'
-
-HEADER = ['Date', 'Time', 'Venue', 'Ground', 'Referee', 'Team', 'Competition Name', 'Your Club Name', 'Opponent', 'Event Type']
-
-# Columns that form the unique key for a fixture (date + team + opponent + competition)
-KEY_COLS = ['Date', 'Team', 'Opponent', 'Competition Name']
-
-# Columns where changes matter for updates
-CHANGE_COLS = ['Time', 'Venue', 'Ground', 'Referee']
+from config import (
+    FIXTURES_CSV as FULL_CSV, BASELINE_CSV, NEW_CSV, CHANGED_CSV, REMOVED_CSV,
+    FIXTURE_HEADER as HEADER, KEY_COLS, CHANGE_COLS,
+)
 
 
 def fixture_key(row):

@@ -9,7 +9,10 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
 import json
+import re
 import time
+
+from config import CLUB_NAME, CLUB_ID, TEAM_ID, RUGBY_INDICATORS
 
 class SeleniumScraper:
     def __init__(self):
@@ -24,8 +27,6 @@ class SeleniumScraper:
         chrome_options.add_argument('--disable-gpu')
         chrome_options.add_argument('--window-size=1920,1080')
         chrome_options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36')
-        chrome_options.add_argument('--ignore-certificate-errors')
-        chrome_options.add_argument('--allow-running-insecure-content')
         
         try:
             self.driver = webdriver.Chrome(options=chrome_options)
@@ -85,7 +86,7 @@ class SeleniumScraper:
                 if fixture_elements:
                     print(f"Found {len(fixture_elements)} fixture elements via class name")
                     return self.process_fixture_elements(fixture_elements)
-            except:
+            except Exception:
                 print("No fixture elements found with 'fixtures' in class")
             
             # Method 4: Look for any table-like structures
@@ -94,16 +95,16 @@ class SeleniumScraper:
                 if fixture_elements:
                     print(f"Found {len(fixture_elements)} table-body elements")
                     return self.process_fixture_elements(fixture_elements)
-            except:
+            except Exception:
                 print("No table-body elements found")
             
             # Method 5: Check page source after JavaScript execution
             print("Checking page source after JavaScript execution...")
             page_source = self.driver.page_source
             
-            # Look for Ballincollig in the page source
-            if 'Ballincollig' in page_source:
-                print("Found 'Ballincollig' in page source, attempting to extract...")
+            # Look for club name in the page source
+            if CLUB_NAME in page_source:
+                print(f"Found '{CLUB_NAME}' in page source, attempting to extract...")
                 return self.extract_from_page_source(page_source)
             
             print("No fixtures found after JavaScript execution")
@@ -124,14 +125,14 @@ class SeleniumScraper:
                 home_team = element.get_attribute('data-hometeam') or ''
                 away_team = element.get_attribute('data-awayteam') or ''
                 date = element.get_attribute('data-date') or ''
-                time = element.get_attribute('data-time') or ''
+                fixture_time = element.get_attribute('data-time') or ''
                 venue = element.get_attribute('data-venue') or ''
                 competition = element.get_attribute('data-compname') or ''
                 
-                # Check if Ballincollig is involved
-                if 'Ballincollig' in home_team or 'Ballincollig' in away_team:
+                # Check if club is involved
+                if CLUB_NAME in home_team or CLUB_NAME in away_team:
                     # Filter out rugby and LGFA
-                    exclude_indicators = ['rfc', 'rugby', 'rugbaí', 'munster bowl', 'boys clubs', 'lgfa', 'ladies']
+                    exclude_indicators = RUGBY_INDICATORS + ['lgfa', 'ladies']
                     comp_lower = competition.lower()
                     
                     if not any(indicator in comp_lower for indicator in exclude_indicators):
@@ -140,7 +141,7 @@ class SeleniumScraper:
                             'home': home_team,
                             'away': away_team,
                             'date': date,
-                            'time': time,
+                            'time': fixture_time,
                             'venue': venue,
                             'competition': competition,
                             'referee': referee.strip()
@@ -152,35 +153,35 @@ class SeleniumScraper:
                 print(f"Error processing element: {e}")
                 continue
         
-        print(f"Processed {len(fixtures)} Ballincollig fixtures")
+        print(f"Processed {len(fixtures)} {CLUB_NAME} fixtures")
         return fixtures
     
     def execute_javascript_fixture_finder(self):
         """Execute JavaScript to find fixtures"""
         
-        js_code = """
+        js_code = f"""
         // Look for fixture data in various places
         var fixtures = [];
         
         // Check for elements with data attributes
         var elements = document.querySelectorAll('ul[data-date], ul[data-hometeam], ul[data-awayteam]');
         
-        for (var i = 0; i < elements.length; i++) {
+        for (var i = 0; i < elements.length; i++) {{
             var el = elements[i];
             var homeTeam = el.getAttribute('data-hometeam') || '';
             var awayTeam = el.getAttribute('data-awayteam') || '';
             
-            if (homeTeam.indexOf('Ballincollig') !== -1 || awayTeam.indexOf('Ballincollig') !== -1) {
-                fixtures.push({
+            if (homeTeam.indexOf('{CLUB_NAME}') !== -1 || awayTeam.indexOf('{CLUB_NAME}') !== -1) {{
+                fixtures.push({{
                     home: homeTeam,
                     away: awayTeam,
                     date: el.getAttribute('data-date') || '',
                     time: el.getAttribute('data-time') || '',
                     venue: el.getAttribute('data-venue') || '',
                     competition: el.getAttribute('data-compname') || ''
-                });
-            }
-        }
+                }});
+            }}
+        }}
         
         return fixtures;
         """
@@ -196,12 +197,11 @@ class SeleniumScraper:
     def extract_from_page_source(self, page_source):
         """Extract fixtures from page source using regex"""
         
-        import re
-        
         fixtures = []
         
         # Look for data attributes in the HTML
-        pattern = r'data-hometeam="([^"]*Ballincollig[^"]*)"|data-awayteam="([^"]*Ballincollig[^"]*)"'
+        club_escaped = re.escape(CLUB_NAME)
+        pattern = fr'data-hometeam="([^"]*{club_escaped}[^"]*)"|data-awayteam="([^"]*{club_escaped}[^"]*)"'
         matches = re.findall(pattern, page_source)
         
         for match in matches:
@@ -211,7 +211,8 @@ class SeleniumScraper:
             # Try to extract the full fixture element
             if home_team or away_team:
                 # Look for the surrounding ul element
-                ul_pattern = fr'<ul[^>]*data-hometeam="({home_team or away_team})"[^>]*>.*?</ul>'
+                team_name = home_team or away_team
+                ul_pattern = fr'<ul[^>]*data-(?:home|away)team="[^"]*{re.escape(team_name)}[^"]*"[^>]*>.*?</ul>'
                 ul_match = re.search(ul_pattern, page_source, re.DOTALL)
                 
                 if ul_match:
@@ -243,7 +244,7 @@ if __name__ == "__main__":
     
     if scraper.driver:
         try:
-            fixtures = scraper.scrape_club_profile(1986, 327535)
+            fixtures = scraper.scrape_club_profile(CLUB_ID, TEAM_ID)
             
             print("\n=== Fixtures Found ===")
             for fixture in fixtures:

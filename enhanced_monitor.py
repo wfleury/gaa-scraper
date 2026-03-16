@@ -2,6 +2,8 @@
 Enhanced GAA Fixture Monitor with notifications and logging
 """
 
+import csv
+import io
 import os
 import json
 from datetime import datetime, timedelta
@@ -11,15 +13,20 @@ import hashlib
 import subprocess
 import sys
 import requests
+from team_mapping import map_team_name as _map_team_name, determine_event_type as _determine_event_type
+from config import (
+    CLUB_NAME, CLUB_ID, TEAM_ID, COMPETITION_ID,
+    HASH_FILE, LOG_FILE, FIXTURES_CSV, NTFY_TOPIC, NTFY_ICON,
+)
 
 class EnhancedFixtureMonitor:
     def __init__(self):
         self.scraper = GAAClubScraper()
         self.selenium_scraper = SeleniumScraper()
-        self.hash_file = "fixture_hashes.json"
-        self.log_file = "monitoring_log.txt"
-        self.output_file = "Ballincollig_Fixtures_Final.csv"
-        self.ntfy_topic = "ballincollig-gaa-fixtures"
+        self.hash_file = HASH_FILE
+        self.log_file = LOG_FILE
+        self.output_file = FIXTURES_CSV
+        self.ntfy_topic = NTFY_TOPIC
         
     def log_message(self, message):
         """Log message to file"""
@@ -35,30 +42,35 @@ class EnhancedFixtureMonitor:
         """Get current fixtures data using Selenium for complete coverage"""
         try:
             # Use Selenium scraper for complete fixture coverage
-            fixtures = self.selenium_scraper.scrape_club_profile(club_id=1986, team_id=327535)
+            fixtures = self.selenium_scraper.scrape_club_profile(club_id=CLUB_ID, team_id=TEAM_ID)
             
             if fixtures:
-                # Convert to CSV format
-                csv_lines = ["Date,Time,Venue,Ground,Referee,Team,Competition Name,Your Club Name,Opponent,Event Type"]
+                # Convert to CSV format using csv.writer for proper escaping
+                output = io.StringIO()
+                writer = csv.writer(output)
+                writer.writerow(["Date", "Time", "Venue", "Ground", "Referee",
+                                 "Team", "Competition Name", "Your Club Name",
+                                 "Opponent", "Event Type"])
                 
+                fixture_count = 0
                 for fixture in fixtures:
                     # Process fixture data
                     home_team = fixture.get('home', '')
                     away_team = fixture.get('away', '')
                     date = fixture.get('date', '')
-                    time = fixture.get('time', '')
+                    time_val = fixture.get('time', '')
                     venue = fixture.get('venue', '')
                     competition = fixture.get('competition', '')
                     
-                    # Determine if Ballincollig is home or away
-                    if 'Ballincollig' in home_team:
+                    # Determine if club is home or away
+                    if CLUB_NAME in home_team:
                         ground = 'Home'
                         opponent = away_team
-                    elif 'Ballincollig' in away_team:
+                    elif CLUB_NAME in away_team:
                         ground = 'Away'
                         opponent = home_team
                     else:
-                        continue  # Skip if no Ballincollig team
+                        continue  # Skip if club not found
                     
                     # Map team name and event type
                     team = self.map_team_name(competition)
@@ -66,30 +78,29 @@ class EnhancedFixtureMonitor:
                     
                     # Format date
                     try:
-                        from datetime import datetime
                         dt = datetime.strptime(date, '%d %b %Y')
                         formatted_date = dt.strftime('%d/%m/%Y')
-                    except:
+                    except (ValueError, TypeError):
                         formatted_date = date
                     
                     # Format time (add leading 0 if needed)
                     # 00:00 means fixture is cancelled/postponed
-                    if time == '00:00' or time == '0:00':
-                        time = 'Postponed'
+                    if time_val == '00:00' or time_val == '0:00':
+                        time_val = 'Postponed'
                         event_type = 'Postponed'
-                    elif time and len(time) == 4:
-                        time = f'0{time}'
+                    elif time_val and len(time_val) == 4:
+                        time_val = f'0{time_val}'
                     
                     referee = fixture.get('referee', '').strip()
                     if not referee:
                         referee = 'TBC (Pending)'
                     
-                    csv_line = f"{formatted_date},{time},{venue},{ground},{referee},{team},{competition},Ballincollig,{opponent},{event_type}"
-                    csv_lines.append(csv_line)
+                    writer.writerow([formatted_date, time_val, venue, ground, referee,
+                                     team, competition, CLUB_NAME, opponent, event_type])
+                    fixture_count += 1
                 
-                fixtures_text = '\n'.join(csv_lines)
-                fixtures_hash = hashlib.md5(fixtures_text.encode()).hexdigest()
-                fixture_count = len(csv_lines) - 1  # Subtract header
+                fixtures_text = output.getvalue().rstrip('\r\n')
+                fixtures_hash = hashlib.sha256(fixtures_text.encode()).hexdigest()
                 
                 return {
                     'hash': fixtures_hash,
@@ -105,11 +116,11 @@ class EnhancedFixtureMonitor:
             self.log_message(f"Error with Selenium scraper: {e}")
             # Fallback to original scraper
             self.log_message("Falling back to original scraper...")
-            club_data = self.scraper.scrape_club_profile(club_id=1986, competition_id=211620, team_id=327535)
+            club_data = self.scraper.scrape_club_profile(club_id=CLUB_ID, competition_id=COMPETITION_ID, team_id=TEAM_ID)
             
             if club_data and club_data.get('fixtures'):
                 fixtures_text = club_data['fixtures']
-                fixtures_hash = hashlib.md5(fixtures_text.encode()).hexdigest()
+                fixtures_hash = hashlib.sha256(fixtures_text.encode()).hexdigest()
                 fixture_count = len(fixtures_text.split('\n')) - 1  # Subtract header
                 
                 return {
@@ -123,8 +134,11 @@ class EnhancedFixtureMonitor:
     def load_previous_data(self):
         """Load previous fixture data"""
         if os.path.exists(self.hash_file):
-            with open(self.hash_file, 'r') as f:
-                return json.load(f)
+            try:
+                with open(self.hash_file, 'r') as f:
+                    return json.load(f)
+            except (json.JSONDecodeError, ValueError):
+                self.log_message("WARNING: Corrupt hash file, treating as fresh run")
         return None
     
     def save_current_data(self, data):
@@ -133,96 +147,12 @@ class EnhancedFixtureMonitor:
             json.dump(data, f, indent=2)
     
     def map_team_name(self, competition_name):
-        """Map competition name to Ballincollig ClubZap team name.
-        
-        ClubZap team names:
-        Senior Football, Premier Inter Hurling,
-        Junior A Football, Junior A Hurling, Junior B Football, Junior B Hurling, Junior C Football,
-        Minor Football GAA, Minor Hurling GAA,
-        U14 GAA, U16 GAA,
-        GAA U21 "A" Football, GAA U21 "A" Hurling, GAA U21 "B" Football, GAA U21 "B" Hurling
-        """
-        comp_lower = competition_name.lower()
-        
-        # Determine code (football or hurling)
-        is_football = any(x in comp_lower for x in ['football', ' fl'])
-        is_hurling = any(x in comp_lower for x in ['hurling', ' hl'])
-        
-        # --- Underage (Fe14 / Fe16 use single "GAA" team name for both codes) ---
-        if 'fe14' in comp_lower:
-            return 'U14 GAA'
-        if 'fe16' in comp_lower:
-            return 'U16 GAA'
-        
-        # --- Minor (Fe18 splits by code) ---
-        if 'fe18' in comp_lower:
-            if is_hurling:
-                return 'Minor Hurling GAA'
-            return 'Minor Football GAA'
-        
-        # --- County Senior Leagues ---
-        if 'mccarthy insurance' in comp_lower or 'mccarthy' in comp_lower:
-            return 'Senior Football'
-        if 'red fm' in comp_lower:
-            return 'Premier Inter Hurling'
-        
-        # --- County Championships ---
-        if 'psfc' in comp_lower or ('premier senior' in comp_lower and is_football):
-            return 'Senior Football'
-        if 'pihc' in comp_lower or ('premier intermediate' in comp_lower and is_hurling):
-            return 'Premier Inter Hurling'
-        
-        # --- Divisional Junior Leagues (AOS Security = Muskerry division) ---
-        if 'aos security' in comp_lower or 'aos ' in comp_lower:
-            if 'div 4' in comp_lower or 'div 5' in comp_lower:
-                if is_hurling:
-                    return 'Junior B Hurling'
-                return 'Junior B Football'
-            elif 'div 3' in comp_lower:
-                if is_hurling:
-                    return 'Junior B Hurling'
-                return 'Junior A Football'
-            else:
-                if is_hurling:
-                    return 'Junior A Hurling'
-                return 'Junior A Football'
-        
-        # --- Muskerry Divisional Junior Leagues (Cumnor, EPH, Erneside Eng sponsors) ---
-        if 'cumnor' in comp_lower:
-            return 'Junior A Hurling'
-        if 'eph ' in comp_lower:
-            if 'division 2' in comp_lower or 'division 3' in comp_lower:
-                return 'Junior B Football'
-            return 'Junior A Football'
-        if 'erneside' in comp_lower:
-            return 'Junior B Hurling'
-        
-        # --- Other Junior/Divisional competitions ---
-        if 'junior' in comp_lower:
-            if is_hurling:
-                return 'Junior A Hurling'
-            return 'Junior A Football'
-        
-        # --- U21 ---
-        if 'u21' in comp_lower or 'u-21' in comp_lower:
-            if is_hurling:
-                return 'GAA U21 "A" Hurling'
-            return 'GAA U21 "A" Football'
-        
-        return 'Unknown'
+        """Map competition name to Ballincollig ClubZap team name."""
+        return _map_team_name(competition_name)
     
     def determine_event_type(self, competition_name):
-        """Determine event type from competition name"""
-        comp_lower = competition_name.lower()
-        
-        if 'championship' in comp_lower:
-            return 'Championship'
-        elif any(x in comp_lower for x in ['cup', 'shield', 'trophy']):
-            return 'Cup'
-        elif any(x in comp_lower for x in ['league', 'division', ' fl', ' hl']):
-            return 'League'
-        else:
-            return 'Other'
+        """Determine event type from competition name."""
+        return _determine_event_type(competition_name)
     
     def regenerate_csv(self, fixtures_text):
         """Regenerate the fixtures CSV"""
@@ -234,8 +164,25 @@ class EnhancedFixtureMonitor:
             self.log_message(f"Error saving CSV: {e}")
             return False
     
+    def _sanitize_for_xml(self, text):
+        """Escape text for safe XML/PowerShell interpolation."""
+        text = str(text)
+        # PowerShell escapes (backtick first, then dollar)
+        text = text.replace("`", "``")
+        text = text.replace("$", "`$")
+        # XML escapes
+        text = text.replace("&", "&amp;")
+        text = text.replace("<", "&lt;")
+        text = text.replace(">", "&gt;")
+        text = text.replace("'", "&apos;")
+        text = text.replace('"', "&quot;")
+        return text
+    
     def send_notification(self, title, message):
         """Send Windows toast + ntfy.sh mobile push notification"""
+        safe_title = self._sanitize_for_xml(title)
+        safe_message = self._sanitize_for_xml(message)
+        
         # --- Windows toast notification ---
         try:
             ps_script = f'''
@@ -244,7 +191,7 @@ class EnhancedFixtureMonitor:
 [Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom.XmlDocument, ContentType = WindowsRuntime] | Out-Null
 
 $xml = New-Object Windows.Data.Xml.Dom.XmlDocument
-$xml.LoadXml('<toast><visual><binding template="ToastGeneric"><text>{title}</text><text>{message}</text></binding></visual></toast>')
+$xml.LoadXml('<toast><visual><binding template="ToastGeneric"><text>{safe_title}</text><text>{safe_message}</text></binding></visual></toast>')
 
 $toast = New-Object Windows.UI.Notifications.ToastNotification($xml)
 [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier("GAA Monitor").Show($toast)
@@ -259,7 +206,7 @@ $toast = New-Object Windows.UI.Notifications.ToastNotification($xml)
             else:
                 msg_script = f'''
 Add-Type -AssemblyName System.Windows.Forms
-[System.Windows.Forms.MessageBox]::Show("{message}", "{title}", "OK", "Information")
+[System.Windows.Forms.MessageBox]::Show("{safe_message}", "{safe_title}", "OK", "Information")
 '''
                 subprocess.run([
                     'powershell', '-Command', msg_script
@@ -274,12 +221,10 @@ Add-Type -AssemblyName System.Windows.Forms
         # --- ntfy.sh mobile push notification ---
         self.send_ntfy(title, message)
     
-    def send_ntfy(self, title, message):
+    def send_ntfy(self, title, message, priority=None):
         """Send push notification to phone via ntfy.sh with Ballincollig crest"""
-        import urllib3
-        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-        # Use low priority (silent) when NTFY_QUIET is set (e.g. early morning GitHub Actions)
-        priority = "low" if os.environ.get("NTFY_QUIET") else "high"
+        if priority is None:
+            priority = "low" if os.environ.get("NTFY_QUIET") else "high"
         try:
             resp = requests.post(
                 f"https://ntfy.sh/{self.ntfy_topic}",
@@ -287,36 +232,12 @@ Add-Type -AssemblyName System.Windows.Forms
                 headers={
                     "Title": title,
                     "Priority": priority,
-                    "Icon": "https://sportlomo-userupload.s3.amazonaws.com/clubLogos/1986/ballincollig.gif"
+                    "Icon": NTFY_ICON,
                 },
                 timeout=10,
-                verify=False
             )
             if resp.status_code == 200:
                 self.log_message("ntfy.sh mobile notification sent")
-            else:
-                self.log_message(f"ntfy.sh returned status {resp.status_code}")
-        except Exception as e:
-            self.log_message(f"Failed to send ntfy.sh notification: {e}")
-    
-    def send_ntfy_quiet(self, title, message):
-        """Send low-priority (silent) push notification via ntfy.sh"""
-        import urllib3
-        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-        try:
-            resp = requests.post(
-                f"https://ntfy.sh/{self.ntfy_topic}",
-                data=message.encode('utf-8'),
-                headers={
-                    "Title": title,
-                    "Priority": "low",
-                    "Icon": "https://sportlomo-userupload.s3.amazonaws.com/clubLogos/1986/ballincollig.gif"
-                },
-                timeout=10,
-                verify=False
-            )
-            if resp.status_code == 200:
-                self.log_message("ntfy.sh quiet notification sent")
             else:
                 self.log_message(f"ntfy.sh returned status {resp.status_code}")
         except Exception as e:
@@ -440,9 +361,9 @@ Add-Type -AssemblyName System.Windows.Forms
                     self.log_message(f"ClubZap sync diff failed: {e}")
                     diff_summary = f"Fixtures: {previous_data['count']} -> {current_data['count']}"
                 
-                notification_msg = f"Ballincollig GAA Fixtures Update\n\n{diff_summary}"
+                notification_msg = f"{CLUB_NAME} GAA Fixtures Update\n\n{diff_summary}"
                 
-                self.send_notification("Ballincollig GAA - Fixture Changes", notification_msg)
+                self.send_notification(f"{CLUB_NAME} GAA - Fixture Changes", notification_msg)
                 
                 self.log_message("SUCCESS: Changes processed successfully")
                 return True
@@ -454,9 +375,10 @@ Add-Type -AssemblyName System.Windows.Forms
             # Always regenerate CSV so it's available for artifacts and sync
             self.regenerate_csv(current_data['text'])
             # Send low-priority "all clear" notification so user knows monitor ran
-            self.send_ntfy_quiet(
-                "Ballincollig GAA - All Clear",
-                f"No fixture changes detected.\n{current_data['count']} fixtures monitored."
+            self.send_ntfy(
+                f"{CLUB_NAME} GAA - All Clear",
+                f"No fixture changes detected.\n{current_data['count']} fixtures monitored.",
+                priority="low",
             )
             return True
 

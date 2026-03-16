@@ -30,6 +30,7 @@ def format_club_data(raw_data):
             value = ' '.join(value.split())
             # Handle "Click here" text in emails
             if field == "email" and "Click here" in value:
+                formatted[field] = ""
                 continue
                 
         formatted[field] = value

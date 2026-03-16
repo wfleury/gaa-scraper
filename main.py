@@ -48,7 +48,7 @@ def main():
         existing_data = load_existing_csv(args.output)
         if existing_data is not None:
             # Convert existing data to list of dicts
-            existing_list = existing_data.to_dict('records')
+            existing_list = existing_data  # already a list of dicts from csv.DictReader
             # Combine with new data
             club_data_list = existing_list + club_data_list
             print(f"Appended {len(club_data_list) - len(existing_list)} new records to existing file")

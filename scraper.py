@@ -3,27 +3,37 @@ GAA Club Profile Scraper
 Extracts club information from gaacork.ie club profile pages
 """
 
+import csv
+import io
+import re
+import time
+from datetime import datetime, timedelta
+
 import requests
 from bs4 import BeautifulSoup
-import time
-import re
-import urllib3
-from datetime import datetime, timedelta
-from urllib.parse import urljoin, urlparse, parse_qs
-from config import BASE_URL, REQUEST_DELAY, TIMEOUT, FIELDS_TO_EXTRACT
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
-# Disable SSL warnings
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+from config import BASE_URL, REQUEST_DELAY, TIMEOUT, CLUB_NAME, RUGBY_INDICATORS
+from team_mapping import map_team_name, determine_event_type
 
 
 class GAAClubScraper:
+    _DATE_PATTERN = re.compile(
+        r'(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\s+(\d{1,2})(?:st|nd|rd|th)\s+'
+        r'(January|February|March|April|May|June|July|August|September|October|November|December)',
+        re.IGNORECASE
+    )
+
     def __init__(self):
         self.session = requests.Session()
         self.session.headers.update({
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
         })
-        # Disable SSL verification for this site
-        self.session.verify = False
+        retry = Retry(total=3, backoff_factor=1, status_forcelist=[500, 502, 503, 504])
+        adapter = HTTPAdapter(max_retries=retry)
+        self.session.mount("https://", adapter)
+        self.session.mount("http://", adapter)
     
     def get_page_content(self, url):
         """
@@ -58,7 +68,9 @@ class GAAClubScraper:
         print(f"Found {len(fixture_elements)} fixture elements on club page")
         
         for element in fixture_elements:
-            fixtures.extend(self.parse_fixture_element(element, club_id))
+            result = self.parse_fixture_element(element, club_id)
+            if result:
+                fixtures.append(result)
         
         # If no fixtures found on the main page, try the competition approach as fallback
         if not fixtures:
@@ -117,58 +129,7 @@ class GAAClubScraper:
             for i, elem in enumerate(fixture_elements[:3]):
                 print(f"Element {i}: {elem.name}, classes: {elem.get('class', [])}")
         
-        for element in fixture_elements:
-            try:
-                # Extract data attributes from the ul element
-                data_date = element.get('data-date', '')
-                data_time = element.get('data-time', '')
-                data_hometeam = element.get('data-hometeam', '')
-                data_awayteam = element.get('data-awayteam', '')
-                data_referee = element.get('data-referee', '')
-                data_venue = element.get('data-venue', '')
-                data_compname = element.get('data-compname', '')
-                
-                print(f"Processing fixture: {data_hometeam} vs {data_awayteam} on {data_date}")
-                
-                # Filter: Only process fixtures where either team is "Ballincollig"
-                if "Ballincollig" not in data_hometeam and "Ballincollig" not in data_awayteam:
-                    print(f"Skipping - no Ballincollig team")
-                    continue
-                
-                # Filter out rugby fixtures (look for rugby indicators)
-                rugby_indicators = ['rfc', 'rugby', 'rugbaí', 'munster bowl', 'boys clubs']
-                comp_lower = data_compname.lower()
-                venue_lower = data_venue.lower()
-                
-                if any(indicator in comp_lower or indicator in venue_lower for indicator in rugby_indicators):
-                    print(f"Skipping rugby fixture: {data_compname}")
-                    continue
-                
-                # Parse and filter future dates
-                try:
-                    fixture_date = datetime.strptime(data_date, "%d %b %Y")
-                    # Date filtering - only include future fixtures
-                    if fixture_date.date() < today.date():
-                        print(f"Skipping past date: {data_date}")
-                        continue
-                except ValueError:
-                    print(f"Invalid date format: {data_date}")
-                    continue
-                
-                # Process the fixture
-                fixture_data = self.process_fixture_data(
-                    data_date, data_time, data_hometeam, data_awayteam,
-                    data_referee, data_venue, data_compname
-                )
-                
-                if fixture_data:
-                    fixtures.append(fixture_data)
-                    print(f"Added fixture: {fixture_data}")
-                    
-            except Exception as e:
-                print(f"Error processing fixture element: {e}")
-                continue
-        
+        fixtures = self.extract_from_data_attributes(fixture_elements, today)
         return fixtures
     
     def extract_from_data_attributes(self, fixture_elements, today):
@@ -188,17 +149,16 @@ class GAAClubScraper:
                 
                 print(f"Processing fixture: {data_hometeam} vs {data_awayteam} on {data_date}")
                 
-                # Filter: Only process fixtures where either team is "Ballincollig"
-                if "Ballincollig" not in data_hometeam and "Ballincollig" not in data_awayteam:
-                    print(f"Skipping - no Ballincollig team")
+                # Filter: Only process fixtures where either team is our club
+                if CLUB_NAME not in data_hometeam and CLUB_NAME not in data_awayteam:
+                    print(f"Skipping - no {CLUB_NAME} team")
                     continue
                 
                 # Filter out rugby fixtures (look for rugby indicators)
-                rugby_indicators = ['rfc', 'rugby', 'rugbaí', 'munster bowl', 'boys clubs']
                 comp_lower = data_compname.lower()
                 venue_lower = data_venue.lower()
                 
-                if any(indicator in comp_lower or indicator in venue_lower for indicator in rugby_indicators):
+                if any(indicator in comp_lower or indicator in venue_lower for indicator in RUGBY_INDICATORS):
                     print(f"Skipping rugby fixture: {data_compname}")
                     continue
                 
@@ -233,9 +193,6 @@ class GAAClubScraper:
         """Extract fixtures from text patterns on the page"""
         fixtures = []
         
-        # Look for date patterns like "Saturday 28th February"
-        date_pattern = re.compile(r'(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\s+(\d{1,2})(?:st|nd|rd|th)\s+(January|February|March|April|May|June|July|August|September|October|November|December)', re.IGNORECASE)
-        
         for element in soup.find_all(['div', 'p', 'li', 'tr', 'span']):
             text = element.get_text().strip()
             
@@ -244,7 +201,7 @@ class GAAClubScraper:
                 continue
             
             # Look for date patterns
-            date_match = date_pattern.search(text)
+            date_match = self._DATE_PATTERN.search(text)
             if date_match:
                 print(f"Found date pattern in text: {text[:100]}...")
                 
@@ -269,9 +226,9 @@ class GAAClubScraper:
                 if len(cells) >= 3:  # At least date, teams, time/venue
                     text = ' '.join([cell.get_text().strip() for cell in cells])
                     
-                    # Check if Ballincollig is mentioned
-                    if "Ballincollig" in text:
-                        print(f"Found Ballincollig in table row: {text[:100]}...")
+                    # Check if our club is mentioned
+                    if CLUB_NAME in text:
+                        print(f"Found {CLUB_NAME} in table row: {text[:100]}...")
                         fixture_data = self.parse_table_fixture(cells, club_id, today)
                         if fixture_data:
                             fixtures.append(fixture_data)
@@ -286,8 +243,7 @@ class GAAClubScraper:
         # For now, create a placeholder fixture
         
         # Extract date
-        date_pattern = re.compile(r'(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\s+(\d{1,2})(?:st|nd|rd|th)\s+(January|February|March|April|May|June|July|August|September|October|November|December)', re.IGNORECASE)
-        date_match = date_pattern.search(text)
+        date_match = self._DATE_PATTERN.search(text)
         
         if not date_match:
             return None
@@ -295,6 +251,9 @@ class GAAClubScraper:
         try:
             day_name, day_num, month_name = date_match.groups()
             fixture_date = datetime.strptime(f"{day_num} {month_name} {today.year}", "%d %B %Y")
+            # If the date is more than 6 months in the past, it's likely next year
+            if fixture_date.date() < today.date() - timedelta(days=180):
+                fixture_date = fixture_date.replace(year=today.year + 1)
             
             if fixture_date.date() < today.date():
                 return None
@@ -312,7 +271,7 @@ class GAAClubScraper:
             'Referee': 'TBC',
             'Team': 'Unknown',
             'Competition Name': 'Unknown Competition',
-            'Your Club Name': 'Ballincollig',
+            'Your Club Name': CLUB_NAME,
             'Opponent': 'Unknown',
             'Event Type': 'League'
         }
@@ -344,23 +303,23 @@ class GAAClubScraper:
                 formatted_time = "0" + data_time
             
             # Your Club Name
-            your_club_name = "Ballincollig"
+            your_club_name = CLUB_NAME
             
             # Team mapping based on competition name
-            team = self.map_team_name(data_compname)
+            team = map_team_name(data_compname)
             
-            # Opponent: The team that is not "Ballincollig"
-            if data_hometeam == "Ballincollig":
+            # Opponent: The team that is not our club
+            if CLUB_NAME in data_hometeam:
                 opponent = data_awayteam
-            elif data_awayteam == "Ballincollig":
+            elif CLUB_NAME in data_awayteam:
                 opponent = data_hometeam
             else:
                 opponent = "Unknown"
             
             # Ground determination
-            if data_hometeam == "Ballincollig" and data_venue == "Ballincollig":
+            if CLUB_NAME in data_hometeam and CLUB_NAME in data_venue:
                 ground = "Home"
-            elif data_awayteam == "Ballincollig":
+            elif CLUB_NAME in data_awayteam:
                 ground = "Away"
             else:
                 ground = "Neutral"
@@ -372,7 +331,7 @@ class GAAClubScraper:
             competition_name = data_compname
             
             # Event Type determination
-            event_type = self.determine_event_type(data_compname)
+            event_type = determine_event_type(data_compname)
             
             return {
                 'Date': formatted_date,
@@ -392,84 +351,12 @@ class GAAClubScraper:
             return None
     
     def map_team_name(self, comp_name):
-        """
-        Map competition name to team name according to rules
-        """
-        comp_lower = comp_name.lower()
-        
-        if "fe12" in comp_lower:
-            return "U12 GAA"
-        elif "fe13" in comp_lower:
-            return "U13 GAA"
-        elif "fe14" in comp_lower:
-            return "U14 GAA"
-        elif "fe15" in comp_lower:
-            return "U15 GAA"
-        elif "fe16" in comp_lower:
-            return "U16 GAA"
-        elif "fe18" in comp_lower and "hurling" in comp_lower:
-            return "Minor Hurling GAA"
-        elif "fe18" in comp_lower and "football" in comp_lower:
-            return "Minor Football GAA"
-        elif "u21 a football" in comp_lower:
-            return 'GAA U21 "A" Football'
-        elif "u21 a hurling" in comp_lower:
-            return "GAA U21 A Hurling"
-        elif "junior a hurling" in comp_lower:
-            return "Junior A Hurling"
-        elif "junior a football" in comp_lower:
-            return "Junior A Football"
-        elif "junior b hurling" in comp_lower:
-            return "Junior B Hurling"
-        elif "senior fc" in comp_lower:
-            return "Senior Football"
-        elif "premier ihc" in comp_lower or "pihc" in comp_lower:
-            return "Premier Inter Hurling"
-        elif "division 2 fl" in comp_lower:
-            return "Junior A Football"
-        elif "division 1 fl" in comp_lower:
-            return "Senior Football"
-        elif "division 3 fl" in comp_lower:
-            return "Junior B Football"
-        elif "division 2 hl" in comp_lower:
-            return "Junior A Hurling"
-        elif "division 1 hl" in comp_lower:
-            return "Senior Hurling"
-        elif "division 3 hl" in comp_lower:
-            return "Junior B Hurling"
-        elif "senior football" in comp_lower:
-            return "Senior Football"
-        elif "premier inter hurling" in comp_lower:
-            return "Premier Inter Hurling"
-        elif "womens" in comp_lower:
-            return "Womens GAA"
-        elif "boys clubs" in comp_lower:
-            return "Boys GAA"
-        elif "u18.5" in comp_lower:
-            return "U18.5 GAA"
-        elif "red fm" in comp_lower and "hl" in comp_lower:
-            return "Junior A Hurling"
-        elif "red fm" in comp_lower and "fl" in comp_lower:
-            return "Junior A Football"
-        elif "mccarthy insurance group" in comp_lower and "fl" in comp_lower:
-            return "Junior A Football"
-        elif "mccarthy insurance group" in comp_lower and "hl" in comp_lower:
-            return "Junior A Hurling"
-        else:
-            return "Unknown"
+        """Map competition name to team name according to rules"""
+        return map_team_name(comp_name)
     
     def determine_event_type(self, comp_name):
-        """
-        Determine event type based on competition name
-        """
-        comp_lower = comp_name.lower()
-        
-        if "championship" in comp_lower or "final" in comp_lower:
-            return "Championship"
-        elif "cup" in comp_lower:
-            return "Cup"
-        else:
-            return "League"
+        """Determine event type based on competition name"""
+        return determine_event_type(comp_name)
     
     def parse_future_fixture_element(self, element, club_id, today):
         """
@@ -486,8 +373,7 @@ class GAAClubScraper:
         text = element.get_text().strip()
         
         # Extract date
-        date_pattern = re.compile(r'(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\s+(\d{1,2})(?:st|nd|rd|th)\s+(January|February|March|April|May|June|July|August|September|October|November|December)', re.IGNORECASE)
-        date_match = date_pattern.search(text)
+        date_match = self._DATE_PATTERN.search(text)
         
         if not date_match:
             return None
@@ -497,6 +383,9 @@ class GAAClubScraper:
         try:
             # Convert to datetime for comparison
             fixture_date = datetime.strptime(f"{day_num} {month_name} {today.year}", "%d %B %Y")
+            # If the date is more than 6 months in the past, it's likely next year
+            if fixture_date.date() < today.date() - timedelta(days=180):
+                fixture_date = fixture_date.replace(year=today.year + 1)
             
             # If fixture date is in the past, skip it
             if fixture_date.date() < today.date():
@@ -665,7 +554,7 @@ class GAAClubScraper:
             club_data['email'] = email
         
         # Extract division (look for division names)
-        divisions = ['Muskerry', 'Seandún', 'Imokilly', 'Carrigdhoun', 'Duhallow', 'Beara', 'Avondhu']
+        divisions = ['Muskerry', 'Seandun', 'Imokilly', 'Carrigdhoun', 'Duhallow', 'Beara', 'Avondhu']
         page_text = soup.get_text().lower()
         for division in divisions:
             if division.lower() in page_text:
@@ -701,18 +590,20 @@ class GAAClubScraper:
         
         if fixtures:
             # Create CSV with exact column order as specified
-            csv_lines = []
-            # Header row
-            csv_lines.append("Date,Time,Venue,Ground,Referee,Team,Competition Name,Your Club Name,Opponent,Event Type")
-            
-            # Data rows
+            output = io.StringIO()
+            writer = csv.writer(output)
+            writer.writerow(["Date", "Time", "Venue", "Ground", "Referee",
+                             "Team", "Competition Name", "Your Club Name",
+                             "Opponent", "Event Type"])
             for fixture in fixtures:
-                csv_line = f"{fixture['Date']},{fixture['Time']},{fixture['Venue']},{fixture['Ground']},{fixture['Referee']},{fixture['Team']},{fixture['Competition Name']},{fixture['Your Club Name']},{fixture['Opponent']},{fixture['Event Type']}"
-                csv_lines.append(csv_line)
-            
-            # Join all lines with newlines
-            club_data['fixtures'] = '\n'.join(csv_lines)
-            club_data['competition_name'] = "Ballincollig Fixtures"
+                writer.writerow([
+                    fixture['Date'], fixture['Time'], fixture['Venue'],
+                    fixture['Ground'], fixture['Referee'], fixture['Team'],
+                    fixture['Competition Name'], fixture['Your Club Name'],
+                    fixture['Opponent'], fixture['Event Type']
+                ])
+            club_data['fixtures'] = output.getvalue().strip()
+            club_data['competition_name'] = f"{CLUB_NAME} Fixtures"
         
         return club_data
     
