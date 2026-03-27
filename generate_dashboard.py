@@ -18,7 +18,8 @@ from datetime import datetime
 from html import escape
 
 from competition_monitor.config import (
-    AGE_GROUPS, BASELINE_DIR, CLUB_NAME, COMPETITIONS, competition_url,
+    AGE_GROUPS, BASELINE_DIR, CLUB_NAME, competition_url,
+    get_active_competitions,
 )
 
 DASHBOARD_DIR = "dashboard"
@@ -29,10 +30,10 @@ OUTPUT_FILE = os.path.join(DASHBOARD_DIR, "index.html")
 # Data loading
 # ------------------------------------------------------------------
 
-def _load_baselines():
-    """Load all competition baselines and return {comp_name: baseline}."""
+def _load_baselines(competitions):
+    """Load competition baselines and return {comp_name: baseline}."""
     baselines = {}
-    for comp_name in COMPETITIONS:
+    for comp_name in competitions:
         safe = comp_name.lower().replace(" ", "_").replace("/", "_")
         path = os.path.join(BASELINE_DIR, f"{safe}.json")
         if os.path.exists(path):
@@ -241,7 +242,8 @@ def _render_table(table):
 # ------------------------------------------------------------------
 
 def generate():
-    baselines = _load_baselines()
+    competitions = get_active_competitions()
+    baselines = _load_baselines(competitions)
     if not baselines:
         print("No baselines found — run the competition monitor first.")
         return
@@ -250,7 +252,7 @@ def generate():
 
     # Group competitions by age group
     by_age = {}
-    for comp_name, comp_config in COMPETITIONS.items():
+    for comp_name, comp_config in competitions.items():
         ag = comp_config.get("age_group", "other")
         by_age.setdefault(ag, []).append((comp_name, comp_config))
 
