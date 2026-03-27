@@ -39,3 +39,4 @@ test-results/
 output/
 competitions_*.txt
 monitor.log
+competition_baselines/

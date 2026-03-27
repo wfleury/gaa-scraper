@@ -1,0 +1,61 @@
+name: Competition Results Monitor
+
+on:
+  schedule:
+    # Runs daily at 06:15 UTC (shortly after the fixture monitor)
+    - cron: '15 6 * * *'
+  workflow_dispatch:  # Manual trigger
+
+jobs:
+  check-results:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Chrome
+        uses: browser-actions/setup-chrome@v1
+        with:
+          chrome-version: stable
+
+      - name: Install ChromeDriver
+        uses: nanasess/setup-chromedriver@v2
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Restore previous baselines
+        uses: actions/cache@v4
+        with:
+          path: competition_baselines/
+          key: comp-baselines-${{ github.run_number }}
+          restore-keys: |
+            comp-baselines-
+
+      - name: Run competition results monitor
+        run: python -m competition_monitor
+        env:
+          DISPLAY: ':99'
+          COMP_NTFY_QUIET: '1'
+
+      - name: Upload baselines as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: competition-baselines-${{ github.run_number }}
+          path: competition_baselines/
+          if-no-files-found: ignore
+          retention-days: 30
+
+      - name: Save baselines for next run
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: competition_baselines/
+          key: comp-baselines-${{ github.run_number }}
