@@ -405,7 +405,8 @@ Add-Type -AssemblyName System.Windows.Forms
             self.log_message(f"INFO: No changes - {current_data['count']} fixtures")
             # Always regenerate CSV so it's available for artifacts and sync
             self.regenerate_csv(current_data['text'])
-            # Send low-priority "all clear" to main topic
+            # Send low-priority "all clear" to main topic only
+            # (per-team topics only get notified when there are actual changes)
             all_clear_msg = (
                 f"No fixture changes detected.\n"
                 f"{current_data['count']} fixtures monitored.\n\n"
@@ -417,20 +418,6 @@ Add-Type -AssemblyName System.Windows.Forms
                 all_clear_msg,
                 priority="low",
             )
-            # Also send to each per-team topic so new team subscribers
-            # get confirmation that their subscription is working
-            from config import CLUBZAP_TEAM_IDS
-            for team_name in CLUBZAP_TEAM_IDS:
-                team_topic = team_ntfy_topic(team_name)
-                self.send_ntfy(
-                    f"{CLUB_NAME} {team_name} - All Clear",
-                    f"No {team_name} fixture changes today.\n\n"
-                    "If you're seeing this for the first time — "
-                    "welcome! Notifications are working.",
-                    priority="low",
-                    topic=team_topic,
-                    team_name=team_name,
-                )
             return True
 
 def main():

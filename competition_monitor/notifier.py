@@ -2,13 +2,14 @@
 ntfy notification sender for Competition Results Monitor.
 
 Sends push notifications for new results, fixture changes,
-and all-clear messages.  Each competition has its own ntfy topic.
+and all-clear messages.  Each competition has its own ntfy topic,
+plus a combined topic per age group.
 """
 
 import os
 import requests
 
-from competition_monitor.config import CLUB_NAME, NTFY_ICON, NTFY_COMBINED_TOPIC, competition_url
+from competition_monitor.config import CLUB_NAME, NTFY_ICON, combined_topic_for, competition_url
 
 
 def _priority():
@@ -39,11 +40,13 @@ def _send(topic, title, message, priority=None, action_url=None):
         print(f"ntfy -> {topic}: FAILED – {e}")
 
 
-def _send_both(comp_topic, title, message, priority=None, action_url=None):
-    """Send to the per-competition topic AND the combined all-U14 topic."""
+def _send_both(comp_config, title, message, priority=None, action_url=None):
+    """Send to the per-competition topic AND the age-group combined topic."""
+    comp_topic = comp_config["ntfy_topic"]
+    combined = combined_topic_for(comp_config)
     _send(comp_topic, title, message, priority=priority, action_url=action_url)
-    if NTFY_COMBINED_TOPIC and NTFY_COMBINED_TOPIC != comp_topic:
-        _send(NTFY_COMBINED_TOPIC, title, message, priority=priority,
+    if combined and combined != comp_topic:
+        _send(combined, title, message, priority=priority,
               action_url=action_url)
 
 
@@ -105,7 +108,7 @@ def notify_our_result(comp_config, diff, comp_name):
             standing = f"\nLeague position: {s['position']} ({s['pts']} pts)"
 
         _send_both(
-            comp_topic=comp_config["ntfy_topic"],
+            comp_config,
             title=f"{CLUB_NAME} {comp_name} - Result",
             message=f"{line}{standing}",
             priority="high" if not os.environ.get("COMP_NTFY_QUIET") else "low",
@@ -125,7 +128,7 @@ def notify_other_results(comp_config, diff, comp_name):
     url = competition_url(comp_config)
 
     _send_both(
-        comp_topic=comp_config["ntfy_topic"],
+        comp_config,
         title=f"{comp_name} - Other Results",
         message=body,
         action_url=url,
@@ -157,7 +160,7 @@ def notify_fixture_changes(comp_config, diff, comp_name):
 
     url = competition_url(comp_config)
     _send_both(
-        comp_topic=comp_config["ntfy_topic"],
+        comp_config,
         title=f"{comp_name} - Fixture Update",
         message="\n\n".join(parts),
         action_url=url,
@@ -168,7 +171,7 @@ def notify_first_run(comp_config, diff, comp_name):
     """Low-priority initialisation message."""
     url = competition_url(comp_config)
     _send_both(
-        comp_topic=comp_config["ntfy_topic"],
+        comp_config,
         title=f"{comp_name} - Monitor Started",
         message=(
             f"Now monitoring {comp_name}.\n"
@@ -182,30 +185,30 @@ def notify_first_run(comp_config, diff, comp_name):
 
 
 def notify_all_clear(comp_config, diff, comp_name):
-    """Low-priority 'no changes' heartbeat."""
-    url = competition_url(comp_config)
+    """Low-priority 'no changes' heartbeat sent to the combined topic only.
 
-    # Find next Ballincollig fixture
-    next_fix = ""
-    from competition_monitor.config import CLUB_NAME as _cn
-    # diff doesn't store fixtures directly, but the monitor passes them
-    # via the fixture_count; we'll keep it simple here.
+    Per-competition topics only receive notifications when there are
+    actual changes, keeping noise down for subscribers.
+    """
+    combined = combined_topic_for(comp_config)
+    if not combined:
+        return
+
+    url = competition_url(comp_config)
 
     standing = ""
     if diff.get("our_standing"):
         s = diff["our_standing"]
         standing = f"\nLeague position: {s['position']} ({s['pts']} pts)"
 
-    _send_both(
-        comp_topic=comp_config["ntfy_topic"],
+    _send(
+        combined,
         title=f"{comp_name} - All Clear",
         message=(
             f"No new results or fixture changes.\n"
             f"{diff['result_count']} results, "
             f"{diff['fixture_count']} upcoming."
-            f"{standing}\n\n"
-            "If you're seeing this for the first time — "
-            "welcome! Notifications are working."
+            f"{standing}"
         ),
         priority="low",
         action_url=url,

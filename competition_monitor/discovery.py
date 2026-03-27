@@ -1,10 +1,10 @@
 """
-Auto-discovery of new Fe14 competitions involving Ballincollig.
+Auto-discovery of new underage competitions involving Ballincollig.
 
-Scrapes the rebelog.ie fixtures page for any Fe14 competition that
-includes Ballincollig but isn't already in our config.  When a new
-competition appears (e.g. championship), sends a notification so the
-user knows to add it.
+Scrapes the rebelog.ie fixtures page for competitions matching the
+configured AGE_GROUPS patterns that include Ballincollig but aren't
+already in our config.  When a new competition appears (e.g.
+championship), sends a notification so the user knows to add it.
 """
 
 import re
@@ -16,12 +16,36 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
 
 from competition_monitor.config import (
-    CLUB_NAME, COMPETITIONS, NTFY_COMBINED_TOPIC, REBELOG_BASE_URL,
+    AGE_GROUPS, CLUB_NAME, COMPETITIONS, NTFY_COMBINED_TOPIC,
+    REBELOG_BASE_URL,
 )
 
 
 # All competition IDs we already monitor
 _KNOWN_IDS = {c["competition_id"] for c in COMPETITIONS.values()}
+
+# Build a set of discovery patterns from AGE_GROUPS (e.g. {"fe13", "fe14", ...})
+_DISCOVERY_PATTERNS = {
+    ag["discovery_pattern"].lower()
+    for ag in AGE_GROUPS.values()
+    if "discovery_pattern" in ag
+}
+
+
+def _matches_any_age_group(name):
+    """Return True if the competition name matches any configured age group."""
+    lower = name.lower()
+    return any(pat in lower for pat in _DISCOVERY_PATTERNS)
+
+
+def _age_group_for_name(name):
+    """Return the AGE_GROUPS key for a competition name, or None."""
+    lower = name.lower()
+    for key, ag in AGE_GROUPS.items():
+        pat = ag.get("discovery_pattern", "").lower()
+        if pat and pat in lower:
+            return key
+    return None
 
 
 def _club_in_competition(driver, league_url):
@@ -37,9 +61,10 @@ def _club_in_competition(driver, league_url):
 
 def discover_new_competitions(driver):
     """Use an existing Selenium driver to scan rebelog.ie for new
-    Fe14 competitions involving Ballincollig.
+    competitions involving Ballincollig across all configured age groups.
 
-    Returns a list of dicts: [{"name": ..., "competition_id": ..., "url": ...}]
+    Returns a list of dicts:
+        [{"name": ..., "competition_id": ..., "url": ..., "age_group": ...}]
     """
     if not driver:
         return []
@@ -61,7 +86,7 @@ def discover_new_competitions(driver):
         except TimeoutException:
             print("Discovery: no fixture elements found, trying links approach")
 
-        # Approach 1: look for competition links with Fe14 + Ballincollig nearby
+        # Approach 1: look for competition links matching age group patterns
         # The fixtures page lists competitions as headings with links to /league/{id}/
         page_source = driver.page_source
 
@@ -71,20 +96,22 @@ def discover_new_competitions(driver):
             re.IGNORECASE,
         )
         # Also grab data attributes from fixture elements
-        comp_pattern = re.compile(
-            r'data-compname="([^"]*fe14[^"]*)"',
+        comp_attr_pattern = re.compile(
+            r'data-compname="([^"]*(?:' +
+            '|'.join(re.escape(p) for p in _DISCOVERY_PATTERNS) +
+            r')[^"]*)"',
             re.IGNORECASE,
         )
-        # Collect all Fe14 competition IDs from league links
-        fe14_comps = {}  # id -> name
+        # Collect all matching competition IDs from league links
+        candidate_comps = {}  # id -> name
         for m in league_pattern.finditer(page_source):
             comp_id = int(m.group(1))
             comp_name = m.group(2).strip()
-            if 'fe14' in comp_name.lower() or 'fé14' in comp_name.lower():
-                fe14_comps[comp_id] = comp_name
+            if _matches_any_age_group(comp_name):
+                candidate_comps[comp_id] = comp_name
 
         # Also check data-compname attributes
-        for m in comp_pattern.finditer(page_source):
+        for m in comp_attr_pattern.finditer(page_source):
             comp_name = m.group(1)
             # Try to find a league link for this competition
             link_match = re.search(
@@ -92,11 +119,11 @@ def discover_new_competitions(driver):
                 page_source[:m.start()][-2000:],  # search nearby
             )
             if link_match:
-                fe14_comps[int(link_match.group(1))] = comp_name
+                candidate_comps[int(link_match.group(1))] = comp_name
 
         # Filter to ones we don't already know, then verify Ballincollig
         # is actually listed in the competition before reporting it.
-        for comp_id, comp_name in fe14_comps.items():
+        for comp_id, comp_name in candidate_comps.items():
             if comp_id not in _KNOWN_IDS:
                 comp_url = f"{REBELOG_BASE_URL}/league/{comp_id}/"
                 if _club_in_competition(driver, comp_url):
@@ -104,6 +131,7 @@ def discover_new_competitions(driver):
                         "name": comp_name,
                         "competition_id": comp_id,
                         "url": comp_url,
+                        "age_group": _age_group_for_name(comp_name),
                     })
                 else:
                     print(f"Discovery: skipping {comp_name} ({comp_id}) – "
@@ -111,10 +139,13 @@ def discover_new_competitions(driver):
 
         # Approach 2: scan fixture elements directly
         try:
+            # Need to reload fixtures page since Approach 1 may have navigated away
+            driver.get(url)
+            time.sleep(3)
             elements = driver.find_elements(By.CSS_SELECTOR, 'ul[data-date]')
             for el in elements:
                 comp_name = el.get_attribute('data-compname') or ''
-                if 'fe14' not in comp_name.lower() and 'fé14' not in comp_name.lower():
+                if not _matches_any_age_group(comp_name):
                     continue
 
                 home = el.get_attribute('data-hometeam') or ''
@@ -143,6 +174,7 @@ def discover_new_competitions(driver):
                                 "name": comp_name,
                                 "competition_id": comp_id,
                                 "url": f"{REBELOG_BASE_URL}/league/{comp_id}/",
+                                "age_group": _age_group_for_name(comp_name),
                             })
                 except Exception:
                     pass
@@ -153,36 +185,52 @@ def discover_new_competitions(driver):
         print(f"Discovery: error – {e}")
 
     if found:
-        print(f"Discovery: found {len(found)} new Fe14 competition(s)!")
+        print(f"Discovery: found {len(found)} new competition(s)!")
         for f in found:
-            print(f"  {f['name']} -> {f['url']}")
+            print(f"  {f['name']} ({f.get('age_group', '?')}) -> {f['url']}")
     else:
-        print("Discovery: no new Fe14 competitions found")
+        print("Discovery: no new competitions found")
 
     return found
 
 
 def notify_new_competitions(new_comps):
-    """Send a notification about newly discovered competitions."""
-    if not new_comps or not NTFY_COMBINED_TOPIC:
+    """Send a notification about newly discovered competitions.
+
+    Groups by age group and sends to each relevant combined topic.
+    """
+    if not new_comps:
         return
 
     from competition_monitor.notifier import _send
 
-    lines = []
+    # Group by age group
+    by_group = {}
     for c in new_comps:
-        lines.append(f"- {c['name']}")
-        lines.append(f"  ID: {c['competition_id']}")
-        lines.append(f"  {c['url']}")
+        ag = c.get("age_group") or "unknown"
+        by_group.setdefault(ag, []).append(c)
 
-    _send(
-        topic=NTFY_COMBINED_TOPIC,
-        title="New Fe14 Competition Found!",
-        message=(
-            "New competition(s) with Ballincollig detected:\n\n"
-            + "\n".join(lines)
-            + "\n\nAdd to competition_monitor/config.py to start tracking."
-        ),
-        priority="high",
-        action_url=new_comps[0]["url"],
-    )
+    for ag, comps in by_group.items():
+        lines = []
+        for c in comps:
+            lines.append(f"- {c['name']}")
+            lines.append(f"  ID: {c['competition_id']}")
+            lines.append(f"  {c['url']}")
+
+        # Send to the age-group combined topic
+        topic = AGE_GROUPS.get(ag, {}).get("ntfy_combined_topic", NTFY_COMBINED_TOPIC)
+        if not topic:
+            topic = NTFY_COMBINED_TOPIC
+
+        ag_label = ag.upper() if ag != "unknown" else ""
+        _send(
+            topic=topic,
+            title=f"New {ag_label} Competition Found!".strip(),
+            message=(
+                f"New competition(s) with {CLUB_NAME} detected:\n\n"
+                + "\n".join(lines)
+                + "\n\nAdd to competition_monitor/config.py to start tracking."
+            ),
+            priority="high",
+            action_url=comps[0]["url"],
+        )

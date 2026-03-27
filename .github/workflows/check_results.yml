@@ -10,6 +10,9 @@ on:
     - cron: '0 21 * * *'
   workflow_dispatch:  # Manual trigger
 
+permissions:
+  contents: write   # needed for gh-pages deployment
+
 jobs:
   check-results:
     runs-on: ubuntu-latest
@@ -48,6 +51,10 @@ jobs:
           DISPLAY: ':99'
           COMP_NTFY_QUIET: '1'
 
+      - name: Generate dashboard
+        if: always()
+        run: python generate_dashboard.py
+
       - name: Upload baselines as artifact
         if: always()
         uses: actions/upload-artifact@v4
@@ -56,6 +63,23 @@ jobs:
           path: competition_baselines/
           if-no-files-found: ignore
           retention-days: 30
+
+      - name: Upload dashboard as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dashboard-${{ github.run_number }}
+          path: dashboard/
+          if-no-files-found: ignore
+          retention-days: 30
+
+      - name: Deploy dashboard to GitHub Pages
+        if: always()
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dashboard
+          keep_files: false
 
       - name: Save baselines for next run
         if: always()

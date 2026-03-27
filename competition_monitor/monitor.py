@@ -41,7 +41,7 @@ def run(competition_filter=None):
         for comp_name, comp_config in competitions.items():
             _process_competition(scraper, comp_name, comp_config)
 
-        # Check for new Fe14 competitions (championships etc.)
+        # Check for new competitions across all age groups
         if scraper.driver:
             new_comps = discover_new_competitions(scraper.driver)
             if new_comps:
