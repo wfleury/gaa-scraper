@@ -151,13 +151,17 @@ python clubzap_automate.py
 ```
 gaa-scraper/
 ├── enhanced_monitor.py      # Main orchestrator — scrape, detect changes, notify
-├── selenium_scraper.py      # Primary scraper (headless Chrome)
-├── scraper.py               # Fallback scraper (requests + BeautifulSoup)
+├── selenium_scraper.py      # Headless Chrome scraper
 ├── clubzap_sync.py          # Diff engine — compares fixtures vs baseline
 ├── clubzap_automate.py      # Browser automation — syncs changes to ClubZap
 ├── team_mapping.py          # Maps competition names to ClubZap team names
 ├── config.py                # Central configuration
 ├── requirements.txt         # Python dependencies
+├── tests/                   # Unit tests (pytest)
+│   ├── test_team_mapping.py
+│   └── test_clubzap_sync.py
+├── scripts/                 # One-off debug/exploration tools
+├── docs/                    # Additional documentation
 └── .github/workflows/
     ├── check_fixtures.yml   # Daily automated run (GitHub Actions)
     └── test_clubzap.yml     # Manual test workflow for ClubZap operations

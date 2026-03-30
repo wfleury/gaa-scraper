@@ -9,7 +9,7 @@ Ballincollig_Fixtures_Final.csv
 competitions_2026.txt
 
 # Diagnostic/test scripts
-inspect_fixture_html.py
+scripts/inspect_fixture_html.py
 
 # Python
 __pycache__/
