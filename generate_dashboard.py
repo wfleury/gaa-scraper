@@ -278,6 +278,8 @@ def _generate_landing_page(age_groups_with_data, now):
 <div class="age-grid">
 {links}
 </div>
+<script data-goatcounter="https://ballincolliggaa.goatcounter.com/count"
+        async src="//gc.zgo.at/count.js"></script>
 </body>
 </html>
 """
@@ -331,6 +333,8 @@ def _generate_age_group_page(ag_key, comps, baselines, now):
 </div>
 <p class="subtitle">{label} Dashboard &mdash; updated {now}</p>
 {content_html}
+<script data-goatcounter="https://ballincolliggaa.goatcounter.com/count"
+        async src="//gc.zgo.at/count.js"></script>
 </body>
 </html>
 """
