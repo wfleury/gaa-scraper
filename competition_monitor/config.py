@@ -213,3 +213,11 @@ def get_active_competitions():
         groups = [g.strip() for g in COMP_AGE_GROUPS_OVERRIDE.split(",")]
         result = {k: v for k, v in result.items() if v.get("age_group") in groups}
     return result
+
+
+def get_active_age_groups():
+    """Return the AGE_GROUPS dict filtered by COMP_AGE_GROUPS env override."""
+    if COMP_AGE_GROUPS_OVERRIDE:
+        groups = [g.strip() for g in COMP_AGE_GROUPS_OVERRIDE.split(",")]
+        return {k: v for k, v in AGE_GROUPS.items() if k in groups}
+    return dict(AGE_GROUPS)

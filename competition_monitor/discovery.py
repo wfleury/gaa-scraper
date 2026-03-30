@@ -17,25 +17,27 @@ from selenium.common.exceptions import TimeoutException
 
 from competition_monitor.config import (
     AGE_GROUPS, CLUB_NAME, COMPETITIONS, NTFY_COMBINED_TOPIC,
-    REBELOG_BASE_URL,
+    REBELOG_BASE_URL, get_active_age_groups,
 )
 
 
 # All competition IDs we already monitor
 _KNOWN_IDS = {c["competition_id"] for c in COMPETITIONS.values()}
 
-# Build a set of discovery patterns from AGE_GROUPS (e.g. {"fe13", "fe14", ...})
-_DISCOVERY_PATTERNS = {
-    ag["discovery_pattern"].lower()
-    for ag in AGE_GROUPS.values()
-    if "discovery_pattern" in ag
-}
+
+def _active_discovery_patterns():
+    """Return discovery patterns for the currently active age groups only."""
+    return {
+        ag["discovery_pattern"].lower()
+        for ag in get_active_age_groups().values()
+        if "discovery_pattern" in ag
+    }
 
 
 def _matches_any_age_group(name):
-    """Return True if the competition name matches any configured age group."""
+    """Return True if the competition name matches any active age group."""
     lower = name.lower()
-    return any(pat in lower for pat in _DISCOVERY_PATTERNS)
+    return any(pat in lower for pat in _active_discovery_patterns())
 
 
 def _age_group_for_name(name):
@@ -96,9 +98,10 @@ def discover_new_competitions(driver):
             re.IGNORECASE,
         )
         # Also grab data attributes from fixture elements
+        patterns = _active_discovery_patterns()
         comp_attr_pattern = re.compile(
             r'data-compname="([^"]*(?:' +
-            '|'.join(re.escape(p) for p in _DISCOVERY_PATTERNS) +
+            '|'.join(re.escape(p) for p in patterns) +
             r')[^"]*)"',
             re.IGNORECASE,
         )
