@@ -221,7 +221,7 @@ class TestScrapeCamogieFixtures:
         fake_leagues = [
             {
                 "url": "http://fake.test/league1/",
-                "team": "BCC Senior Squad",
+                "team": "BCC 2026 Senior Squad",
                 "club_name": "Ballincollig",
                 "competition": "Test Camogie League",
             },
@@ -239,7 +239,7 @@ class TestScrapeCamogieFixtures:
         fixtures = scrape_camogie_fixtures(leagues=fake_leagues)
         assert len(fixtures) == 2
         for fx in fixtures:
-            assert fx["team"] == "BCC Senior Squad"
+            assert fx["team"] == "BCC 2026 Senior Squad"
             assert fx["competition"] == "Test Camogie League"
             assert "_has_score" not in fx  # internal key stripped
 
@@ -248,7 +248,7 @@ class TestScrapeCamogieFixtures:
         fake_leagues = [
             {
                 "url": "http://fake.test/league1/",
-                "team": "BCC Senior Squad",
+                "team": "BCC 2026 Senior Squad",
                 "club_name": "Ballincollig",
                 "competition": "Test League",
             },
@@ -270,13 +270,13 @@ class TestScrapeCamogieFixtures:
         fake_leagues = [
             {
                 "url": "http://fake.test/league1/",
-                "team": "BCC Senior Squad",
+                "team": "BCC 2026 Senior Squad",
                 "club_name": "Ballincollig",
                 "competition": "League 1",
             },
             {
                 "url": "http://fake.test/league2/",
-                "team": "BCC Junior Squad",
+                "team": "BCC 2026 Junior Squad",
                 "club_name": "Ballincollig 2",
                 "competition": "League 2",
             },
@@ -298,7 +298,7 @@ class TestScrapeCamogieFixtures:
         fixtures = scrape_camogie_fixtures(leagues=fake_leagues)
         assert len(fixtures) == 2
         teams = {f["team"] for f in fixtures}
-        assert teams == {"BCC Senior Squad", "BCC Junior Squad"}
+        assert teams == {"BCC 2026 Senior Squad", "BCC 2026 Junior Squad"}
 
     def test_http_failure_skips_league(self, monkeypatch):
         """If a league page fails to load, other leagues still work."""
@@ -307,7 +307,7 @@ class TestScrapeCamogieFixtures:
         fake_leagues = [
             {
                 "url": "http://fake.test/broken/",
-                "team": "BCC Senior Squad",
+                "team": "BCC 2026 Senior Squad",
                 "club_name": "Ballincollig",
                 "competition": "Broken League",
             },

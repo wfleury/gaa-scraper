@@ -54,8 +54,8 @@ CLUBZAP_TEAM_IDS = {
     'GAA U21 "B" Football': "20192",
     'GAA U21 "B" Hurling': "24008",
     # Camogie teams (IDs to be added once configured in ClubZap)
-    "BCC Senior Squad": "29608",
-    "BCC Junior Squad": "29554",
+    "BCC 2026 Senior Squad": "29608",
+    "BCC 2026 Junior Squad": "29554",
     "BCC 2026 Minor": "30316",
 }
 
@@ -119,19 +119,19 @@ RUGBY_INDICATORS = ["rfc", "rugby", "rugbai", "munster bowl", "boys clubs"]
 CAMOGIE_LEAGUES = [
     {
         "url": "https://corkcamogie.com/premier-intermediate-league-2026/",
-        "team": "BCC Senior Squad",
+        "team": "BCC 2026 Senior Squad",
         "club_name": "Ballincollig",
         "competition": "Premier Intermediate Camogie League 2026",
     },
     {
         "url": "https://corkcamogie.com/barry-osullivan-league-2026/",
-        "team": "BCC Junior Squad",
+        "team": "BCC 2026 Junior Squad",
         "club_name": "Ballincollig 2",
         "competition": "Barry O'Sullivan Camogie League 2026",
     },
     {
         "url": "https://corkcamogie.com/lily-grant-league-2026/",
-        "team": "BCC Junior Squad",
+        "team": "BCC 2026 Junior Squad",
         "club_name": "Ballincollig 3",
         "competition": "Lily Grant Camogie League 2026",
     },
