@@ -182,6 +182,9 @@ NTFY_ICON = "https://sportlomo-userupload.s3.amazonaws.com/clubLogos/1986/ballin
 # Legacy combined topic (kept for backwards compat, U14 only)
 NTFY_COMBINED_TOPIC = "ballincollig-u14-results"
 
+# ---- Dashboard ----
+DASHBOARD_BASE_URL = "https://wfleury.github.io/ballincollig-gaa"
+
 # ---- File paths ----
 BASELINE_DIR = "competition_baselines"
 
@@ -192,6 +195,14 @@ RUGBY_INDICATORS = ["rfc", "rugby", "rugbai", "munster bowl", "boys clubs"]
 def competition_url(comp):
     """Return the full URL for a competition page."""
     return f"{comp['base_url']}/league/{comp['competition_id']}/"
+
+
+def dashboard_url(comp):
+    """Return the GitHub Pages dashboard URL for this competition's age group, or None."""
+    ag = comp.get("age_group", "")
+    if ag and DASHBOARD_BASE_URL:
+        return f"{DASHBOARD_BASE_URL}/{ag}/"
+    return None
 
 
 def combined_topic_for(comp):

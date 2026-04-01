@@ -9,7 +9,7 @@ plus a combined topic per age group.
 import os
 import requests
 
-from competition_monitor.config import CLUB_NAME, NTFY_ICON, combined_topic_for, competition_url
+from competition_monitor.config import CLUB_NAME, NTFY_ICON, combined_topic_for, competition_url, dashboard_url
 from gaa_utils import gaa_total
 
 
@@ -30,7 +30,7 @@ def _send(topic, title, message, priority=None, action_url=None):
         "Content-Type": "text/plain; charset=utf-8",
     }
     if action_url:
-        headers["Actions"] = f"view, View Competition, {action_url}"
+        headers["Actions"] = f"view, View Dashboard, {action_url}"
 
     body = message.encode("utf-8")
     if len(body) > _MAX_BODY_BYTES:
@@ -96,13 +96,22 @@ def _our_result_line(result):
     return f"{CLUB_NAME} {our_score} {verb} {opponent} {their_score}"
 
 
+def _action_url(comp_config):
+    """Return the best URL for notification action buttons.
+
+    Prefers the GitHub Pages dashboard URL when available,
+    falling back to the rebelog.ie competition page.
+    """
+    return dashboard_url(comp_config) or competition_url(comp_config)
+
+
 # ------------------------------------------------------------------
 # Public notification helpers
 # ------------------------------------------------------------------
 
 def notify_our_result(comp_config, diff, comp_name):
     """High-priority notification for each Ballincollig result."""
-    url = competition_url(comp_config)
+    url = _action_url(comp_config)
     for r in diff["our_new_results"]:
         line = _our_result_line(r)
         standing = ""
@@ -131,7 +140,7 @@ def notify_other_results(comp_config, diff, comp_name):
     if len(others) > MAX_SHOW:
         lines.append(f"... and {len(others) - MAX_SHOW} more")
     body = "\n".join(lines)
-    url = competition_url(comp_config)
+    url = _action_url(comp_config)
 
     _send_both(
         comp_config,
@@ -170,7 +179,7 @@ def notify_fixture_changes(comp_config, diff, comp_name):
         parts = parts[:MAX_PARTS]
         parts.append(f"... and {extra} more changes")
 
-    url = competition_url(comp_config)
+    url = _action_url(comp_config)
     _send_both(
         comp_config,
         title=f"{comp_name} - Fixture Update",
@@ -181,7 +190,7 @@ def notify_fixture_changes(comp_config, diff, comp_name):
 
 def notify_first_run(comp_config, diff, comp_name):
     """Low-priority initialisation message."""
-    url = competition_url(comp_config)
+    url = _action_url(comp_config)
     _send_both(
         comp_config,
         title=f"{comp_name} - Monitor Started",
@@ -206,7 +215,7 @@ def notify_all_clear(comp_config, diff, comp_name):
     if not combined:
         return
 
-    url = competition_url(comp_config)
+    url = _action_url(comp_config)
 
     standing = ""
     if diff.get("our_standing"):
