@@ -75,8 +75,8 @@ def parse_fixture_cards(html, club_name):
         date_str, time_str = _parse_datetime(date_raw)
 
         teams = re.findall(r'foireann-team-name[^>]*>([^<]*)<', card)
-        home = teams[0].strip() if len(teams) > 0 else ""
-        away = teams[1].strip() if len(teams) > 1 else ""
+        home = unescape(teams[0].strip()) if len(teams) > 0 else ""
+        away = unescape(teams[1].strip()) if len(teams) > 1 else ""
 
         # Only keep fixtures involving our club
         if club_name.lower() not in home.lower() and club_name.lower() not in away.lower():
